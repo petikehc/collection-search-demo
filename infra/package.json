@@ -10,7 +10,8 @@
   },
   "dependencies": {
     "aws-cdk-lib": "2.275.0",
-    "constructs": "10.8.1"
+    "constructs": "10.8.1",
+    "yaml": "2.9.1"
   },
   "devDependencies": {
     "aws-cdk": "2.1148.0",

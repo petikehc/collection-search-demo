@@ -1,7 +1,6 @@
 import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import { EbsDeviceVolumeType } from 'aws-cdk-lib/aws-ec2';
 import { AccountRootPrincipal, type IRole, PolicyStatement, Role } from 'aws-cdk-lib/aws-iam';
-import { Architecture, LoggingFormat, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import {
@@ -12,6 +11,7 @@ import {
 } from 'aws-cdk-lib/aws-opensearchservice';
 import type { Construct } from 'constructs';
 import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
+import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
 import { FUNCTIONS_DIR, OpenSearchRole, OpenSearchRoleProvider } from './opensearch-role.js';
 
 export const DOMAIN_NAME = 'collection-search';
@@ -107,15 +107,13 @@ export class SearchStack extends Stack {
     // Full ingest: Collection API → normalise → new versioned index → alias swap.
     const ingest = new NodejsFunction(this, 'IngestFunction', {
       description: 'Fetches a Collection API sample and rebuilds the objects index',
+      ...LAMBDA_DEFAULTS,
       entry: `${FUNCTIONS_DIR}ingest/handler.ts`,
-      runtime: Runtime.NODEJS_24_X,
-      architecture: Architecture.ARM_64,
       memorySize: 1024,
       timeout: Duration.minutes(10),
       // One ingest at a time, so two runs can't race on the alias swap.
       reservedConcurrentExecutions: 1,
-      environment: { DOMAIN_ENDPOINT: this.domain.domainEndpoint },
-      loggingFormat: LoggingFormat.JSON,
+      environment: { ...LAMBDA_DEFAULTS.environment, DOMAIN_ENDPOINT: this.domain.domainEndpoint },
       logGroup: new LogGroup(this, 'IngestLogs', {
         retention: RetentionDays.TWO_WEEKS,
         removalPolicy: RemovalPolicy.DESTROY,

@@ -1,0 +1,169 @@
+openapi: 3.0.3
+info:
+  title: Collection Search API
+  version: 1.0.0
+  description: |
+    Keyword search over a sample of the National Museum of Australia's collection, indexed in
+    Amazon OpenSearch Service. This API was developed using the National Museum of Australia's
+    Collection API. Collection metadata is licensed CC BY-NC 4.0; every result links back to the
+    record on the Museum's website. Not affiliated with the National Museum of Australia.
+
+    API Gateway is created from this file (infra/lib/api-stack.ts). Integrations are added there,
+    so this file stays a plain, portable contract.
+
+x-amazon-apigateway-api-key-source: HEADER
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Liveness check (no API key, no backend)
+      responses:
+        "200":
+          description: The API is up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+
+  /search:
+    get:
+      operationId: searchObjects
+      summary: Search collection objects, with facets
+      security:
+        - apiKey: []
+      parameters:
+        - name: q
+          in: query
+          description: Free-text query. Omit to browse everything.
+          schema: { type: string, maxLength: 200 }
+        - name: type
+          in: query
+          description: Filter by object type (exact value from the `types` facet).
+          schema: { type: string, maxLength: 200 }
+        - name: place
+          in: query
+          description: Filter by place (exact value from the `places` facet).
+          schema: { type: string, maxLength: 200 }
+        - name: yearFrom
+          in: query
+          description: Only dated objects whose date range overlaps [yearFrom, yearTo].
+          schema: { type: integer, minimum: 0, maximum: 2100 }
+        - name: yearTo
+          in: query
+          schema: { type: integer, minimum: 0, maximum: 2100 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 1 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        "200":
+          description: Matching objects and facet counts
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Missing or invalid API key
+        "429":
+          description: Throttled (stage limit or usage plan quota)
+
+components:
+  securitySchemes:
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  responses:
+    BadRequest:
+      description: Invalid parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [ok] }
+
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    SearchResponse:
+      type: object
+      required: [total, page, size, results, facets, attribution]
+      properties:
+        total: { type: integer, description: "Total matching objects (exact up to 10,000)" }
+        page: { type: integer }
+        size: { type: integer }
+        results:
+          type: array
+          items:
+            $ref: "#/components/schemas/SearchResult"
+        facets:
+          $ref: "#/components/schemas/Facets"
+        attribution: { type: string }
+
+    SearchResult:
+      type: object
+      required: [id, title, types, places, sourceUrl, retrievedAt]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        types: { type: array, items: { type: string } }
+        collection: { type: string }
+        places: { type: array, items: { type: string } }
+        dateLabel: { type: string }
+        yearStart: { type: integer }
+        yearEnd: { type: integer }
+        thumbnail:
+          $ref: "#/components/schemas/Image"
+        highlight:
+          type: string
+          description: Matching snippet with matches wrapped in <mark></mark>
+        sourceUrl: { type: string, description: The record on the Museum's website }
+        retrievedAt: { type: string, format: date-time }
+
+    Image:
+      type: object
+      required: [url, rightsTitle]
+      properties:
+        url: { type: string, description: Hotlinked from the Museum; never copied }
+        rightsTitle: { type: string }
+        rightsUrl: { type: string }
+
+    Facets:
+      type: object
+      required: [types, places, decades, datedCount]
+      properties:
+        types: { type: array, items: { $ref: "#/components/schemas/FacetValue" } }
+        places: { type: array, items: { $ref: "#/components/schemas/FacetValue" } }
+        decades:
+          type: array
+          items:
+            type: object
+            required: [decade, count]
+            properties:
+              decade: { type: integer, example: 1910 }
+              count: { type: integer }
+        datedCount:
+          type: integer
+          description: How many matching objects have a date at all (most don't)
+
+    FacetValue:
+      type: object
+      required: [value, count]
+      properties:
+        value: { type: string }
+        count: { type: integer }

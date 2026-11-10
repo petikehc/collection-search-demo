@@ -16,7 +16,9 @@
     "os": "tsx scripts/os.ts",
     "cdk:deploy": "pnpm --filter infra exec cdk deploy",
     "ingest": "tsx scripts/ingest.ts",
-    "check:analysis": "tsx scripts/check-analysis.ts"
+    "check:analysis": "tsx scripts/check-analysis.ts",
+    "generate:api": "openapi-typescript openapi.yaml -o functions/lib/api/types.gen.ts",
+    "check:bundles": "pnpm synth && tsx scripts/check-bundles.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -28,8 +30,10 @@
     "@aws-sdk/client-lambda": "3.1165.0",
     "@biomejs/biome": "2.6.6",
     "@types/node": "24.19.2",
+    "openapi-typescript": "7.13.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
-    "vitest": "5.1.0"
+    "vitest": "5.1.0",
+    "yaml": "2.9.1"
   }
 }
