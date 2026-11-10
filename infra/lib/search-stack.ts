@@ -1,4 +1,4 @@
-import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps, TimeZone } from 'aws-cdk-lib';
 import { EbsDeviceVolumeType } from 'aws-cdk-lib/aws-ec2';
 import { AccountRootPrincipal, type IRole, PolicyStatement, Role } from 'aws-cdk-lib/aws-iam';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -9,6 +9,8 @@ import {
   IpAddressType,
   TLSSecurityPolicy,
 } from 'aws-cdk-lib/aws-opensearchservice';
+import { Schedule, ScheduleExpression } from 'aws-cdk-lib/aws-scheduler';
+import { LambdaInvoke } from 'aws-cdk-lib/aws-scheduler-targets';
 import type { Construct } from 'constructs';
 import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
 import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
@@ -134,6 +136,20 @@ export class SearchStack extends Stack {
           allowedActions: ['crud', 'manage'],
         },
       ],
+    });
+
+    // Daily full refresh at 3 am Sydney time (Scheduler handles daylight saving; a classic
+    // EventBridge rule is UTC only). Deployed disabled; enable with `-c dailyRefresh=true`.
+    // See docs/adr/0005-collection-data-use-and-refresh.md.
+    new Schedule(this, 'DailyRefresh', {
+      description: 'Daily full re-ingest from the Collection API',
+      schedule: ScheduleExpression.cron({
+        minute: '0',
+        hour: '3',
+        timeZone: TimeZone.AUSTRALIA_SYDNEY,
+      }),
+      target: new LambdaInvoke(ingest, { retryAttempts: 0 }),
+      enabled: this.node.tryGetContext('dailyRefresh') === 'true',
     });
 
     new CfnOutput(this, 'IngestFunctionName', { value: ingest.functionName });

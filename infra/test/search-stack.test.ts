@@ -104,3 +104,26 @@ describe('SearchStack ingest', () => {
     });
   });
 });
+
+describe('SearchStack daily refresh', () => {
+  const build = (extra: Record<string, string> = {}) =>
+    Template.fromStack(
+      new SearchStack(new App({ context: { ...context, ...extra } }), 'RefreshTest', {
+        env: { account: '111111111111', region: 'ap-southeast-2' },
+      }),
+    );
+
+  it('runs at 3 am Sydney time and is disabled by default', () => {
+    build().hasResourceProperties('AWS::Scheduler::Schedule', {
+      ScheduleExpression: 'cron(0 3 * * ? *)',
+      ScheduleExpressionTimezone: 'Australia/Sydney',
+      State: 'DISABLED',
+    });
+  });
+
+  it('is enabled with -c dailyRefresh=true', () => {
+    build({ dailyRefresh: 'true' }).hasResourceProperties('AWS::Scheduler::Schedule', {
+      State: 'ENABLED',
+    });
+  });
+});

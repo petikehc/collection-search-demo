@@ -18,7 +18,9 @@
     "ingest": "tsx scripts/ingest.ts",
     "check:analysis": "tsx scripts/check-analysis.ts",
     "generate:api": "openapi-typescript openapi.yaml -o functions/lib/api/types.gen.ts",
-    "check:bundles": "pnpm synth && tsx scripts/check-bundles.ts"
+    "check:bundles": "pnpm synth && tsx scripts/check-bundles.ts",
+    "status": "tsx scripts/status.ts",
+    "teardown": "tsx scripts/teardown.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -26,8 +28,17 @@
     ]
   },
   "devDependencies": {
+    "@aws-sdk/client-api-gateway": "3.1165.0",
+    "@aws-sdk/client-bedrock": "3.1165.0",
     "@aws-sdk/client-cloudformation": "3.1165.0",
+    "@aws-sdk/client-cloudwatch-logs": "3.1165.0",
+    "@aws-sdk/client-cost-explorer": "3.1165.0",
+    "@aws-sdk/client-ec2": "3.1165.0",
     "@aws-sdk/client-lambda": "3.1165.0",
+    "@aws-sdk/client-opensearch": "3.1165.0",
+    "@aws-sdk/client-opensearchserverless": "3.1165.0",
+    "@aws-sdk/client-resource-groups-tagging-api": "3.1165.0",
+    "@aws-sdk/client-secrets-manager": "3.1165.0",
     "@biomejs/biome": "2.6.6",
     "@types/node": "24.19.2",
     "openapi-typescript": "7.13.0",
