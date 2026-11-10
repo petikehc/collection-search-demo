@@ -1,0 +1,90 @@
+{
+  "_attribution": "Trimmed from records retrieved from the National Museum of Australia Collection API (https://data.nma.gov.au) on 2026-11-10. Metadata licensed CC BY-NC 4.0 by the National Museum of Australia. Used here only as a test fixture.",
+  "data": [
+    {
+      "id": "30339",
+      "type": "object",
+      "additionalType": ["Firebricks"],
+      "title": "Fire lighter",
+      "collection": {
+        "id": "927",
+        "type": "Collection",
+        "title": "Lyn Cousins and Chris Tyrell collection"
+      },
+      "identifier": "1986.0107.0035",
+      "medium": [
+        { "type": "Material", "title": "Ceramic" },
+        { "type": "Material", "title": "Wire - non specific" }
+      ],
+      "physicalDescription": "A squarish piece of handmade brick bound with light gauge wire extending into a twisted handle and loop.",
+      "spatial": [
+        {
+          "id": "663",
+          "type": "Place",
+          "title": "Eden, New South Wales, Australia",
+          "roleName": "Place made"
+        },
+        {
+          "id": "373",
+          "type": "Place",
+          "title": "Burrogate, New South Wales, Australia",
+          "roleName": "Place made"
+        },
+        {
+          "id": "373",
+          "type": "Place",
+          "title": "Burrogate, New South Wales, Australia",
+          "roleName": "Place used"
+        }
+      ],
+      "temporal": [
+        {
+          "type": "Event",
+          "title": "1926 - 1983",
+          "startDate": "1926",
+          "endDate": "1983",
+          "roleName": "Date made"
+        }
+      ],
+      "hasVersion": [
+        {
+          "id": "MA67851258",
+          "type": "StillImage",
+          "rights": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+          "rightsTitle": "CC BY-NC-SA 4.0",
+          "hasVersion": [
+            {
+              "type": "StillImage",
+              "version": "preview image",
+              "identifier": "https://collectionsearch.nma.gov.au/nmacs-image-download/prodderivW/67851258/nma-acc-20183042-149-wm_w.jpg"
+            },
+            {
+              "type": "StillImage",
+              "version": "thumbnail image",
+              "identifier": "https://collectionsearch.nma.gov.au/nmacs-image-download/prodderivT/67851258/nma-acc-20183042-149-wm_t.jpg"
+            }
+          ]
+        }
+      ],
+      "_meta": {
+        "modified": "2026-06-12",
+        "hasFormat": "https://collectionsearch.nma.gov.au/s/hw/EMU.EMUIRN/30339",
+        "licence": "https://creativecommons.org/licenses/by-nc/4.0/"
+      }
+    },
+    {
+      "id": "279318",
+      "type": "object",
+      "additionalType": ["Tractors"],
+      "title": "  1912 McDonald EB Imperial tractor no.140\nwith crank handle ",
+      "creator": [{ "id": "", "roleName": "Artist", "interactionType": "Production" }],
+      "hasVersion": [{ "id": "MA1", "type": "StillImage", "hasVersion": [] }],
+      "_meta": { "hasFormat": "https://collectionsearch.nma.gov.au/s/hw/EMU.EMUIRN/279318" }
+    },
+    {
+      "id": "99999",
+      "type": "object",
+      "title": "Record without a link back to the Museum"
+    }
+  ]
+}
