@@ -7,6 +7,12 @@ export interface SampleSlice {
   count: number;
 }
 
+/** About 2,000 objects with images plus about 2,000 from the whole collection. */
+export const DEFAULT_SAMPLE_SLICES: SampleSlice[] = [
+  { query: 'media=*', count: 2000 },
+  { query: 'text=*', count: 2000 },
+];
+
 export interface SampleOptions {
   slices: SampleSlice[];
   pageSize?: number;

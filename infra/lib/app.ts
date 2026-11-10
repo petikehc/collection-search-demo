@@ -1,4 +1,5 @@
-import { App, type Environment } from 'aws-cdk-lib';
+import { App, Aspects, type Environment } from 'aws-cdk-lib';
+import { LogGroupDefaults } from './log-group-defaults.js';
 import { SearchStack } from './search-stack.js';
 
 export const PROJECT_TAGS = { project: 'collection-search-demo', 'managed-by': 'cdk' };
@@ -16,6 +17,8 @@ export function buildApp(app = new App()): App {
   // Stack tags (explicitStackTags flag) are propagated by CloudFormation to every resource
   // that supports tags, so teardown and cost reports can find them.
   new SearchStack(app, 'CollectionSearch-Search', { env, tags: PROJECT_TAGS });
+
+  Aspects.of(app).add(new LogGroupDefaults());
 
   return app;
 }

@@ -63,3 +63,44 @@ describe('SearchStack', () => {
     template.hasResource('AWS::OpenSearchService::Domain', { DeletionPolicy: 'Delete' });
   });
 });
+
+describe('SearchStack ingest', () => {
+  const app = new App({ context });
+  const template = Template.fromStack(
+    new SearchStack(app, 'IngestTest', {
+      env: { account: '111111111111', region: 'ap-southeast-2' },
+    }),
+  );
+
+  it('runs at most one ingest at a time', () => {
+    template.hasResourceProperties('AWS::Lambda::Function', {
+      Description: Match.stringLikeRegexp('rebuilds the objects index'),
+      ReservedConcurrentExecutions: 1,
+      Runtime: 'nodejs24.x',
+      Architectures: ['arm64'],
+    });
+  });
+
+  it('maps the ingest Lambda to a write role scoped to the objects indices', () => {
+    template.hasResourceProperties('Custom::OpenSearchRole', {
+      RoleName: 'ingest_writer',
+      BackendRoles: [{ 'Fn::GetAtt': [Match.stringLikeRegexp('^IngestFunction'), 'Arn'] }],
+      IndexPermissions: [
+        { index_patterns: ['objects', 'objects-*'], allowed_actions: ['crud', 'manage'] },
+      ],
+    });
+  });
+
+  it('lets the role custom resource assume only the admin role', () => {
+    template.hasResourceProperties('AWS::IAM::Policy', {
+      PolicyDocument: {
+        Statement: Match.arrayWith([
+          Match.objectLike({
+            Action: 'sts:AssumeRole',
+            Resource: { 'Fn::GetAtt': [Match.stringLikeRegexp('^OpenSearchAdminRole'), 'Arn'] },
+          }),
+        ]),
+      },
+    });
+  });
+});

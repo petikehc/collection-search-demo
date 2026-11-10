@@ -8,7 +8,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { NmaClient } from '../functions/lib/nma/client.js';
 import { type CollectionObject, normaliseObject } from '../functions/lib/nma/normalise.js';
-import { fetchSample } from '../functions/lib/nma/sample.js';
+import { DEFAULT_SAMPLE_SLICES, fetchSample } from '../functions/lib/nma/sample.js';
 
 const OUT_FILE = new URL('../data/objects.jsonl', import.meta.url);
 
@@ -16,10 +16,7 @@ const client = new NmaClient({ apiKey: process.env.NMA_API_KEY || undefined });
 const started = Date.now();
 
 const raw = await fetchSample(client, {
-  slices: [
-    { query: 'media=*', count: 2000 },
-    { query: 'text=*', count: 2000 },
-  ],
+  slices: DEFAULT_SAMPLE_SLICES,
   onPage: ({ query, offset, received }) =>
     console.log(`  ${query.padEnd(8)} offset ${String(offset).padStart(6)}: ${received}`),
 });

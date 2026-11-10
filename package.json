@@ -14,7 +14,9 @@
     "synth": "pnpm --filter infra synth",
     "fetch-sample": "tsx scripts/fetch-sample.ts",
     "os": "tsx scripts/os.ts",
-    "cdk:deploy": "pnpm --filter infra exec cdk deploy"
+    "cdk:deploy": "pnpm --filter infra exec cdk deploy",
+    "ingest": "tsx scripts/ingest.ts",
+    "check:analysis": "tsx scripts/check-analysis.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

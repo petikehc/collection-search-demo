@@ -16,3 +16,20 @@ describe('CDK app', () => {
     }
   });
 });
+
+describe('log group defaults', () => {
+  it('caps retention at 14 days and deletes every log group with its stack', () => {
+    const assembly = buildApp(new App({ context })).synth();
+    for (const stack of assembly.stacks) {
+      const resources = Object.values(stack.template.Resources ?? {}) as {
+        Type: string;
+        DeletionPolicy?: string;
+        Properties?: { RetentionInDays?: number };
+      }[];
+      for (const r of resources.filter((r) => r.Type === 'AWS::Logs::LogGroup')) {
+        expect(r.Properties?.RetentionInDays).toBeLessThanOrEqual(14);
+        expect(r.DeletionPolicy).toBe('Delete');
+      }
+    }
+  });
+});

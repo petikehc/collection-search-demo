@@ -3,5 +3,6 @@
   "compilerOptions": {
     "lib": ["ES2024", "DOM"]
   },
-  "include": ["lib", "test"]
+  "include": ["**/*.ts", "**/*.json"],
+  "exclude": ["node_modules"]
 }

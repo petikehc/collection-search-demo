@@ -1,0 +1,197 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "analysis": {
+      "filter": {
+        "english_possessive": {
+          "type": "stemmer",
+          "language": "possessive_english"
+        },
+        "english_stop": {
+          "type": "stop",
+          "stopwords": "_english_"
+        },
+        "english_kstem": {
+          "type": "kstem"
+        },
+        "collection_synonyms": {
+          "type": "synonym_graph",
+          "lenient": true,
+          "synonyms": [
+            "boomerang, kylie",
+            "spear thrower, spearthrower, woomera",
+            "coolamon, carrying dish",
+            "dilly bag, dillybag",
+            "billy, billycan",
+            "swag, bedroll",
+            "ute, utility vehicle",
+            "pram, perambulator, baby carriage",
+            "jumper, sweater, pullover",
+            "esky, cooler, icebox",
+            "lolly, lollies, sweets, confectionery",
+            "carve, carving",
+            "photo, photograph",
+            "postcard, post card"
+          ]
+        }
+      },
+      "analyzer": {
+        "collection_text": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "english_possessive",
+            "english_stop",
+            "english_kstem"
+          ]
+        },
+        "collection_search": {
+          "type": "custom",
+          "tokenizer": "standard",
+          "filter": [
+            "lowercase",
+            "asciifolding",
+            "english_possessive",
+            "english_stop",
+            "english_kstem",
+            "collection_synonyms"
+          ]
+        }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "id": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 512
+          }
+        }
+      },
+      "types": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "collection": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "accessionNumber": {
+        "type": "keyword"
+      },
+      "materials": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "places": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "creators": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "yearStart": {
+        "type": "integer"
+      },
+      "yearEnd": {
+        "type": "integer"
+      },
+      "dateLabel": {
+        "type": "keyword",
+        "index": false
+      },
+      "physicalDescription": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search"
+      },
+      "contentDescription": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search"
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search"
+      },
+      "significanceStatement": {
+        "type": "text",
+        "analyzer": "collection_text",
+        "search_analyzer": "collection_search"
+      },
+      "hasImage": {
+        "type": "boolean"
+      },
+      "images": {
+        "type": "object",
+        "enabled": false
+      },
+      "sourceUrl": {
+        "type": "keyword",
+        "index": false
+      },
+      "modified": {
+        "type": "date",
+        "format": "strict_date_optional_time||yyyy-MM-dd"
+      },
+      "licence": {
+        "type": "keyword",
+        "index": false
+      },
+      "retrievedAt": {
+        "type": "date"
+      }
+    }
+  }
+}

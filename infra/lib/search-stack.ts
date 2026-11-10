@@ -1,6 +1,8 @@
-import { CfnOutput, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, Duration, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import { EbsDeviceVolumeType } from 'aws-cdk-lib/aws-ec2';
-import { AccountRootPrincipal, PolicyStatement, Role } from 'aws-cdk-lib/aws-iam';
+import { AccountRootPrincipal, type IRole, PolicyStatement, Role } from 'aws-cdk-lib/aws-iam';
+import { Architecture, LoggingFormat, Runtime } from 'aws-cdk-lib/aws-lambda';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
 import {
   Domain,
@@ -9,6 +11,8 @@ import {
   TLSSecurityPolicy,
 } from 'aws-cdk-lib/aws-opensearchservice';
 import type { Construct } from 'constructs';
+import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
+import { FUNCTIONS_DIR, OpenSearchRole, OpenSearchRoleProvider } from './opensearch-role.js';
 
 export const DOMAIN_NAME = 'collection-search';
 export const DATA_NODE_INSTANCE_TYPE = 'm7g.medium.search';
@@ -21,6 +25,8 @@ export class SearchStack extends Stack {
   readonly domain: Domain;
   /** The fine-grained access control master user. Only this role can change OpenSearch security config. */
   readonly adminRole: Role;
+  /** Reused by other stacks to map their IAM roles to OpenSearch roles. */
+  readonly openSearchRoles: OpenSearchRoleProvider;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, { description: 'Collection search: OpenSearch domain and ingest', ...props });
@@ -92,6 +98,47 @@ export class SearchStack extends Stack {
       new PolicyStatement({ actions: ['es:ESHttp*'], resources: [`${this.domain.domainArn}/*`] }),
     );
 
+    // Creates and maps one fine-grained access control role per workload (see OpenSearchRole).
+    this.openSearchRoles = new OpenSearchRoleProvider(this, 'OpenSearchRoles', {
+      domain: this.domain,
+      adminRole: this.adminRole,
+    });
+
+    // Full ingest: Collection API → normalise → new versioned index → alias swap.
+    const ingest = new NodejsFunction(this, 'IngestFunction', {
+      description: 'Fetches a Collection API sample and rebuilds the objects index',
+      entry: `${FUNCTIONS_DIR}ingest/handler.ts`,
+      runtime: Runtime.NODEJS_24_X,
+      architecture: Architecture.ARM_64,
+      memorySize: 1024,
+      timeout: Duration.minutes(10),
+      // One ingest at a time, so two runs can't race on the alias swap.
+      reservedConcurrentExecutions: 1,
+      environment: { DOMAIN_ENDPOINT: this.domain.domainEndpoint },
+      loggingFormat: LoggingFormat.JSON,
+      logGroup: new LogGroup(this, 'IngestLogs', {
+        retention: RetentionDays.TWO_WEEKS,
+        removalPolicy: RemovalPolicy.DESTROY,
+      }),
+    });
+
+    // Write access to the objects indices and alias only: no other index, no security config.
+    new OpenSearchRole(this, 'IngestWriterRole', {
+      provider: this.openSearchRoles,
+      domain: this.domain,
+      adminRole: this.adminRole,
+      roleName: 'ingest_writer',
+      backendRoles: [ingest.role as IRole],
+      clusterPermissions: ['cluster_composite_ops', 'cluster_monitor'],
+      indexPermissions: [
+        {
+          indexPatterns: [OBJECTS_ALIAS, `${OBJECTS_ALIAS}-*`],
+          allowedActions: ['crud', 'manage'],
+        },
+      ],
+    });
+
+    new CfnOutput(this, 'IngestFunctionName', { value: ingest.functionName });
     new CfnOutput(this, 'DomainEndpoint', { value: this.domain.domainEndpoint });
     new CfnOutput(this, 'DomainArn', { value: this.domain.domainArn });
     new CfnOutput(this, 'AdminRoleArn', { value: this.adminRole.roleArn });
