@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.astro/
+
+# CDK output and account-keyed lookups
+cdk.out/
+cdk.context.json
+
+# Local secrets and env
+.env
+.env.*
+!.env.example
+
+# Fetched Museum data is never committed; the ingest fetches it at run time
+data/
+
+.DS_Store
+*.log
