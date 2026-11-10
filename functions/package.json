@@ -4,5 +4,12 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc -p ."
+  },
+  "dependencies": {
+    "@aws-sdk/credential-providers": "3.1165.0",
+    "@opensearch-project/opensearch": "3.9.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "8.10.164"
   }
 }
