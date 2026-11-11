@@ -2,3 +2,7 @@ packages:
   - infra
   - functions
   - web
+
+# Refuse to resolve any package version published less than 14 days ago (in minutes). Most
+# hijacked releases are found and pulled within days. Versions already in the lockfile still install.
+minimumReleaseAge: 20160
