@@ -1,7 +1,7 @@
 import type { Client } from '@opensearch-project/opensearch';
 import { describe, expect, it } from 'vitest';
 import type { CollectionObject } from '../lib/nma/normalise.js';
-import { reindex, toSearchDocument } from '../lib/search/reindex.js';
+import { readObjects, reindex, toSearchDocument } from '../lib/search/reindex.js';
 
 const doc = toSearchDocument({
   id: '1',
@@ -65,5 +65,33 @@ describe('reindex', () => {
     const { client, calls } = fakeClient({ fail: 'get' });
     await expect(reindex(client, [doc], { now: NOW })).rejects.toThrow('get failed');
     expect(calls.some((c) => c.method === 'delete')).toBe(false);
+  });
+});
+
+describe('readObjects', () => {
+  it('reads one index page by page, in ID order, without the derived fields', async () => {
+    const requests: { index: string; body: { from: number; size: number } }[] = [];
+    const pages = [
+      Array.from({ length: 1000 }, (_, i) => ({ _source: { id: String(i) } })),
+      [{ _source: { id: 'last' } }],
+    ];
+    const client = {
+      search: async (params: (typeof requests)[number]) => {
+        requests.push(params);
+        return { body: { hits: { hits: pages[requests.length - 1] ?? [] } } };
+      },
+    } as unknown as Client;
+
+    const objects = await readObjects(client, 'objects-20261110235504');
+    expect(objects).toHaveLength(1001);
+    expect(objects.at(-1)).toEqual({ id: 'last' });
+    expect(requests.map((r) => [r.index, r.body.from])).toEqual([
+      ['objects-20261110235504', 0],
+      ['objects-20261110235504', 1000],
+    ]);
+    expect(requests[0]?.body).toMatchObject({
+      sort: [{ id: 'asc' }],
+      _source: { excludes: ['embedding', 'hasImage'] },
+    });
   });
 });

@@ -20,9 +20,12 @@ export interface SampleOptions {
 }
 
 /**
- * Fetches a varied, reproducible sample: for each slice, pages spread evenly across all
- * matching results, rather than just the first N (which come back in one relevance order).
- * Objects found by more than one slice are kept once.
+ * Fetches a varied sample: for each slice, pages spread evenly across all matching results,
+ * rather than just the first N (which come back in one relevance order). Objects found by more
+ * than one slice are kept once.
+ *
+ * The sample is only stable while the Museum's data is: after one of its updates, the same
+ * offsets returned mostly different objects (10% of one sample was in the next day's).
  */
 export async function fetchSample(client: NmaClient, options: SampleOptions): Promise<NmaObject[]> {
   const pageSize = options.pageSize ?? 100;
