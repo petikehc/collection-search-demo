@@ -75,7 +75,7 @@ describe('AiStack model invocation logging', () => {
   const search = new SearchStack(app, 'Search', { env });
   const template = Template.fromStack(new AiStack(app, 'Ai', { env, search }));
 
-  it('masks email addresses and Australian phone numbers in the invocation logs', () => {
+  it('masks email addresses, Australian phone numbers and card numbers in the invocation logs', () => {
     const [group] = Object.values(
       template.findResources('AWS::Logs::LogGroup', {
         Properties: { DataProtectionPolicy: Match.anyValue() },
@@ -84,6 +84,7 @@ describe('AiStack model invocation logging', () => {
     const policy = JSON.stringify(group?.Properties.DataProtectionPolicy);
     expect(policy).toContain('EmailAddress');
     expect(policy).toContain('AuPhoneNumber');
+    expect(policy).toContain('CreditCardNumber');
   });
 
   it('turns logging off again when the stack is deleted', () => {

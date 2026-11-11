@@ -183,10 +183,14 @@ export class AiStack extends Stack {
       retention: RetentionDays.TWO_WEEKS,
       removalPolicy: RemovalPolicy.DESTROY,
       dataProtectionPolicy: new DataProtectionPolicy({
-        name: 'mask-contact-details',
+        name: 'mask-personal-details',
         identifiers: [
           DataIdentifier.EMAILADDRESS,
           new CustomDataIdentifier('AuPhoneNumber', AU_PHONE_REGEX),
+          // The guardrail blocks card numbers, but the invocation log still keeps the original input.
+          DataIdentifier.CREDITCARDNUMBER,
+          DataIdentifier.CREDITCARDEXPIRATION,
+          DataIdentifier.CREDITCARDSECURITYCODE,
         ],
       }),
     });
