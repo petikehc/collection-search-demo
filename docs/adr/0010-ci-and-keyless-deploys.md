@@ -43,7 +43,11 @@ The usual shortcut, an IAM user's access keys stored as GitHub secrets, gives us
 
 - Actions are pinned to commit SHAs, with the release in a comment, because tags can be moved.
 - The CI checkout doesn't keep the GitHub token (`persist-credentials: false`).
-- Dependencies install from the lockfile only (`--frozen-lockfile`).
+- Dependencies install from the lockfile only (`--frozen-lockfile`), and only allow-listed packages may run install scripts (`onlyBuiltDependencies`).
+- **No release younger than 14 days.** Hijacked releases are usually found and pulled within days. pnpm enforces this (`minimumReleaseAge` in `pnpm-workspace.yaml`): it refuses to resolve a younger version, even one named exactly, unless the package is added to `minimumReleaseAgeExclude`. Versions already in the lockfile still install.
+  - The rule was followed by hand for actions but slipped for npm. When it was enforced, 23 of 39 direct dependencies were younger than 14 days (mostly AWS SDK clients). They were kept, with no known advisories (`pnpm audit`), because by 24 November 2026 they're all older than 14 days, and downgrading would have meant more churn and risk. That's the case for a tool over a habit.
+- **Dependabot** (`.github/dependabot.yml`) opens weekly, grouped update PRs for actions and npm with the same 14-day cooldown, so pins don't go stale. CI checks each PR. Security updates skip the cooldown. Dependabot PRs can't deploy.
+- **Next, not built:** blocking unexpected network egress on the runners (for example StepSecurity Harden-Runner, in audit mode first). It would stop a compromised dependency sending secrets out, at the cost of trusting one more third-party action with the whole runner.
 
 The `Ci` stack is deployed once by hand, and `pnpm teardown` keeps it. The deploy workflow doesn't redeploy it, so a workflow can't widen its own permissions.
 
