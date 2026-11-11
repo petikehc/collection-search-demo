@@ -5,7 +5,9 @@ import {
   CustomDataIdentifier,
   DataIdentifier,
   DataProtectionPolicy,
+  FilterPattern,
   LogGroup,
+  MetricFilter,
   RetentionDays,
 } from 'aws-cdk-lib/aws-logs';
 import {
@@ -19,6 +21,8 @@ import { OpenSearchIndex, OpenSearchRole } from './opensearch-role.js';
 import type { SearchStack } from './search-stack.js';
 
 export const KB_INDEX = 'kb-objects';
+/** Namespace for the app's own metrics (Powertools in the Lambdas, metric filters here). */
+export const METRICS_NAMESPACE = 'CollectionSearch';
 export const EMBEDDING_MODEL_ID = 'amazon.titan-embed-text-v2:0';
 const EMBEDDING_DIMENSIONS = 1024;
 
@@ -204,6 +208,16 @@ export class AiStack extends Stack {
       }),
     });
     invocationLogs.grantWrite(loggingRole);
+
+    // The sacred-knowledge topic is detect-only (docs/adr/0007): count detections from the
+    // guardrail trace in the invocation logs, so they can be reviewed on the dashboard.
+    new MetricFilter(this, 'SacredTopicDetections', {
+      logGroup: invocationLogs,
+      filterPattern: FilterPattern.literal('"Secret or sacred cultural knowledge"'),
+      metricNamespace: METRICS_NAMESPACE,
+      metricName: 'SacredTopicDetections',
+      metricValue: '1',
+    });
 
     new AwsCustomResource(this, 'InvocationLogging', {
       onUpdate: {

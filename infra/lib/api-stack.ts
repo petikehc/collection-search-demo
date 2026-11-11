@@ -16,9 +16,10 @@ import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
 import { parse } from 'yaml';
 import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
-import type { AiStack } from './ai-stack.js';
+import { type AiStack, METRICS_NAMESPACE } from './ai-stack.js';
 import { AskGuardrail } from './guardrail.js';
 import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
+import { Monitoring } from './monitoring.js';
 import { FUNCTIONS_DIR, OpenSearchRole } from './opensearch-role.js';
 import type { SearchStack } from './search-stack.js';
 
@@ -184,7 +185,18 @@ export class ApiStack extends Stack {
     plan.addApiKey(key);
     plan.addApiStage({ stage: api.deploymentStage });
 
+    const monitoring = new Monitoring(this, 'Monitoring', {
+      api,
+      searchFn,
+      askFn,
+      ingestFn: props.search.ingestFn,
+      domain,
+      askModelId: ASK_PROFILE_ID,
+      metricsNamespace: METRICS_NAMESPACE,
+    });
+
     new CfnOutput(this, 'ApiUrl', { value: api.url });
+    new CfnOutput(this, 'AlarmTopicArn', { value: monitoring.topic.topicArn });
     new CfnOutput(this, 'ApiKeySecretArn', { value: keySecret.secretArn });
     new CfnOutput(this, 'SearchFunctionName', { value: searchFn.functionName });
     new CfnOutput(this, 'AskModelArn', { value: askProfileArn });

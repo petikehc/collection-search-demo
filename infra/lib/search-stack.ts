@@ -33,6 +33,7 @@ export class SearchStack extends Stack {
   readonly openSearchRoles: OpenSearchRoleProvider;
   /** Knowledge Base source documents, written by the ingest under kb/. */
   readonly docsBucket: Bucket;
+  readonly ingestFn: NodejsFunction;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, { description: 'Collection search: OpenSearch domain and ingest', ...props });
@@ -139,6 +140,7 @@ export class SearchStack extends Stack {
         removalPolicy: RemovalPolicy.DESTROY,
       }),
     });
+    this.ingestFn = ingest;
 
     // List, read, write and delete under kb/ only.
     this.docsBucket.grantReadWrite(ingest, `${KB_PREFIX}*`);
