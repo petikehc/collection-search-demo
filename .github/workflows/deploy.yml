@@ -39,6 +39,7 @@ jobs:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ap-southeast-2
 
-      # The Api stack and everything it depends on (Search, Ai, Auth). The Ci stack is deployed
-      # by hand: the deploy role shouldn't redeploy its own permissions.
-      - run: pnpm cdk:deploy CollectionSearch-Api --require-approval never
+      # The web front end and everything it depends on (Api, Auth, Domain, Search, Ai). The synth
+      # runs the Astro build. The Ci stack is deployed by hand: the deploy role shouldn't
+      # redeploy its own permissions.
+      - run: pnpm cdk:deploy CollectionSearch-Web --require-approval never
