@@ -20,6 +20,9 @@ importers:
       '@aws-sdk/client-bedrock-agent-runtime':
         specifier: 3.1166.0
         version: 3.1166.0
+      '@aws-sdk/client-bedrock-runtime':
+        specifier: 3.1166.0
+        version: 3.1166.0
       '@aws-sdk/client-cloudformation':
         specifier: 3.1165.0
         version: 3.1165.0
@@ -177,6 +180,10 @@ packages:
     resolution: {integrity: sha512-iYu/ljYxpE/P3o4afpCmMNRubjQcXV51r3Y+VytJs2NrZHXp0U4kj+D6aQWr3DBBDuvVAf7K39l2DNsPuJmQ8A==}
     engines: {node: '>=20.0.0'}
 
+  '@aws-sdk/client-bedrock-runtime@3.1166.0':
+    resolution: {integrity: sha512-SUp9mKkMzYQc/Sh6JWnwvOdTayoV0/oqgQBr1DMwsFTILiyq+HU+Lb1Zuv0JMSxTcbYOiQzMDZ5uT+5LRrHt7Q==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/client-bedrock@3.1165.0':
     resolution: {integrity: sha512-g0x+AZNqudN0p7JKVJ/l8du0Fj5toyugRnhaEhAIS5GgZ+Hb/PCjOiEOH+I01xZrri7hyt228LtQyo3vXN6F0g==}
     engines: {node: '>=20.0.0'}
@@ -301,6 +308,14 @@ packages:
     resolution: {integrity: sha512-Z5NiNUG6fXy8b6TfkCxOiim5TOLGN7CbXP50ekmG6AgMNEPHFKzBLfoFdvShNQoCIo2Xs/Axnw4/XaqpIIwXEg==}
     engines: {node: '>=20.0.0'}
 
+  '@aws-sdk/eventstream-handler-node@3.972.42':
+    resolution: {integrity: sha512-YVB1wrpE1WF8NvMpaRyhwm9XBYl3HTbPNEIgybi0b0XpmBrJ7Y3Y/drbxh9qAVMbR+0hcwM63GPWzhOVRuerfg==}
+    engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/middleware-eventstream@3.972.38':
+    resolution: {integrity: sha512-4K6FDz2BxH3rve8Hw/8uApWXKCuKKMeYKzY23PoiGqUBWaA23eAy+GzW9aoG3Cm7HqgYzqkljl3ECJRJCxGs7g==}
+    engines: {node: '>=20.0.0'}
+
   '@aws-sdk/middleware-sdk-api-gateway@3.972.36':
     resolution: {integrity: sha512-OqNWQYNr2PJiSjBU276C4nya50ttofF/eCArJ1QEXzmoz5/RiTmBfbPMVR36WzZOplhuAqpbQ/5HhY3kDkmM0g==}
     engines: {node: '>=20.0.0'}
@@ -312,6 +327,10 @@ packages:
   '@aws-sdk/middleware-sdk-s3@3.972.89':
     resolution: {integrity: sha512-Lem2/ZT1eOicVATBukPRPm2S4JAmrTEkP3/dnJE9iTeyqIKqsJF2j04f5L0o+rrZIrwR13swiQMdzcE5jXRzNA==}
     engines: {node: '>=20.0.0'}
+
+  '@aws-sdk/middleware-websocket@3.972.66':
+    resolution: {integrity: sha512-feGNDB15ZgqX4DTsUykkgj7d8hzfzx03v80EIyRA1FTbsbAJQKxYB50kRbrrpE5WeFaWhgk+p5YHlsoyXrI2/g==}
+    engines: {node: '>= 14.0.0'}
 
   '@aws-sdk/nested-clients@3.998.2':
     resolution: {integrity: sha512-T1vNOfMdvdjXU4Nq267iTFoxZ2Bj0vEatkp66j8wBtrpDoX1mBWmxy7RL8O93S2oXo+BFEiXH3nWtLMd0svLnA==}
@@ -1285,6 +1304,21 @@ snapshots:
       '@smithy/types': 4.20.0
       tslib: 2.9.1
 
+  '@aws-sdk/client-bedrock-runtime@3.1166.0':
+    dependencies:
+      '@aws-sdk/core': 3.981.0
+      '@aws-sdk/credential-provider-node': 3.972.96
+      '@aws-sdk/eventstream-handler-node': 3.972.42
+      '@aws-sdk/middleware-eventstream': 3.972.38
+      '@aws-sdk/middleware-websocket': 3.972.66
+      '@aws-sdk/token-providers': 3.1166.0
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.40.0
+      '@smithy/fetch-http-handler': 5.8.1
+      '@smithy/node-http-handler': 4.14.2
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
   '@aws-sdk/client-bedrock@3.1165.0':
     dependencies:
       '@aws-sdk/core': 3.980.2
@@ -1628,6 +1662,20 @@ snapshots:
       '@smithy/types': 4.20.0
       tslib: 2.9.1
 
+  '@aws-sdk/eventstream-handler-node@3.972.42':
+    dependencies:
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.40.0
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
+  '@aws-sdk/middleware-eventstream@3.972.38':
+    dependencies:
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.40.0
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
   '@aws-sdk/middleware-sdk-api-gateway@3.972.36':
     dependencies:
       '@aws-sdk/types': 3.975.1
@@ -1650,6 +1698,16 @@ snapshots:
       '@aws-sdk/signature-v4-multi-region': 3.996.52
       '@aws-sdk/types': 3.975.1
       '@smithy/core': 3.40.0
+      '@smithy/types': 4.20.0
+      tslib: 2.9.1
+
+  '@aws-sdk/middleware-websocket@3.972.66':
+    dependencies:
+      '@aws-sdk/core': 3.981.0
+      '@aws-sdk/types': 3.975.1
+      '@smithy/core': 3.40.0
+      '@smithy/fetch-http-handler': 5.8.1
+      '@smithy/signature-v4': 5.7.5
       '@smithy/types': 4.20.0
       tslib: 2.9.1
 

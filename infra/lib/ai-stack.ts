@@ -3,6 +3,7 @@ import { CfnDataSource, CfnKnowledgeBase } from 'aws-cdk-lib/aws-bedrock';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import type { Construct } from 'constructs';
 import { KB_PREFIX } from '../../functions/lib/kb/documents.js';
+import { AskGuardrail } from './guardrail.js';
 import { OpenSearchIndex, OpenSearchRole } from './opensearch-role.js';
 import type { SearchStack } from './search-stack.js';
 
@@ -27,6 +28,7 @@ export interface AiStackProps extends StackProps {
  */
 export class AiStack extends Stack {
   readonly knowledgeBase: CfnKnowledgeBase;
+  readonly guardrail: AskGuardrail;
 
   constructor(scope: Construct, id: string, props: AiStackProps) {
     super(scope, id, { description: 'Collection search: Bedrock Knowledge Base', ...props });
@@ -161,7 +163,11 @@ export class AiStack extends Stack {
       },
     });
 
+    this.guardrail = new AskGuardrail(this, 'AskGuardrail');
+
     new CfnOutput(this, 'KnowledgeBaseId', { value: this.knowledgeBase.attrKnowledgeBaseId });
+    new CfnOutput(this, 'GuardrailId', { value: this.guardrail.guardrailId });
+    new CfnOutput(this, 'GuardrailVersion', { value: this.guardrail.version });
     new CfnOutput(this, 'DataSourceId', { value: dataSource.attrDataSourceId });
   }
 }

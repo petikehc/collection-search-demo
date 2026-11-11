@@ -69,3 +69,53 @@ describe('AiStack', () => {
     });
   });
 });
+
+describe('AiStack guardrail', () => {
+  const app = new App({ context });
+  const search = new SearchStack(app, 'Search', { env });
+  const template = Template.fromStack(new AiStack(app, 'Ai', { env, search }));
+  const [guardrail] = Object.values(template.findResources('AWS::Bedrock::Guardrail'));
+  const props = guardrail?.Properties;
+
+  it('blocks prompt attacks on input and checks violence only lightly on output', () => {
+    expect(props.ContentPolicyConfig.FiltersConfig).toEqual(
+      expect.arrayContaining([
+        { Type: 'PROMPT_ATTACK', InputStrength: 'HIGH', OutputStrength: 'NONE' },
+        { Type: 'VIOLENCE', InputStrength: 'MEDIUM', OutputStrength: 'LOW' },
+      ]),
+    );
+  });
+
+  it('denies valuation and secret or sacred cultural knowledge', () => {
+    const names = props.TopicPolicyConfig.TopicsConfig.map((t: { Name: string }) => t.Name);
+    expect(names).toEqual(['Object valuation', 'Secret or sacred cultural knowledge']);
+  });
+
+  it('checks denied topics on input only (answers come from published records)', () => {
+    for (const topic of props.TopicPolicyConfig.TopicsConfig) {
+      expect(topic).toMatchObject({ InputEnabled: true, OutputEnabled: false });
+      expect(topic.Definition.length).toBeLessThanOrEqual(200); // Classic tier limit
+    }
+  });
+
+  it('masks contact details but never names (historical people are the collection)', () => {
+    const types = props.SensitiveInformationPolicyConfig.PiiEntitiesConfig.map(
+      (p: { Type: string }) => p.Type,
+    );
+    expect(types).toContain('EMAIL');
+    expect(types).not.toContain('NAME');
+  });
+
+  it('checks grounding and relevance of answers', () => {
+    expect(props.ContextualGroundingPolicyConfig.FiltersConfig).toEqual([
+      { Type: 'GROUNDING', Threshold: 0.7 },
+      { Type: 'RELEVANCE', Threshold: 0.5 },
+    ]);
+  });
+
+  it('publishes a version whose description tracks the configuration', () => {
+    template.hasResourceProperties('AWS::Bedrock::GuardrailVersion', {
+      Description: Match.stringLikeRegexp('^Ask endpoint, config [0-9a-f]{12}$'),
+    });
+  });
+});
