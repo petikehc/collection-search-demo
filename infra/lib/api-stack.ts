@@ -8,6 +8,8 @@ import {
   Period,
   SpecRestApi,
 } from 'aws-cdk-lib/aws-apigateway';
+import type { IUserPool } from 'aws-cdk-lib/aws-cognito';
+import { AttributeType, TableV2 } from 'aws-cdk-lib/aws-dynamodb';
 import { type IRole, PolicyStatement, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Tracing } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -34,6 +36,8 @@ const OPENAPI_FILE = new URL('../../openapi.yaml', import.meta.url);
 export interface ApiStackProps extends StackProps {
   search: SearchStack;
   ai: AiStack;
+  /** Signs users in for /ask and /favourites. */
+  userPool: IUserPool;
 }
 
 /**
@@ -138,10 +142,45 @@ export class ApiStack extends Stack {
       }),
     );
 
+    // Favourites: one partition per user. On-demand billing: nothing is charged while idle.
+    const favouritesTable = new TableV2(this, 'Favourites', {
+      partitionKey: { name: 'sub', type: AttributeType.STRING },
+      sortKey: { name: 'objectId', type: AttributeType.STRING },
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+    const favouritesFn = new NodejsFunction(this, 'FavouritesFunction', {
+      description: "/favourites: the signed-in user's favourite objects in DynamoDB",
+      ...LAMBDA_DEFAULTS,
+      entry: `${FUNCTIONS_DIR}favourites/handler.ts`,
+      memorySize: 256,
+      timeout: Duration.seconds(5),
+      tracing: Tracing.ACTIVE,
+      logGroup: new LogGroup(this, 'FavouritesLogs'),
+      environment: {
+        ...LAMBDA_DEFAULTS.environment,
+        TABLE_NAME: favouritesTable.tableName,
+        POWERTOOLS_SERVICE_NAME: 'favourites',
+      },
+    });
+    // Only the three calls the handler makes; no Scan, so the function can't list other users.
+    favouritesTable.grant(
+      favouritesFn,
+      'dynamodb:Query',
+      'dynamodb:PutItem',
+      'dynamodb:DeleteItem',
+    );
+
     const api = new SpecRestApi(this, 'Api', {
       restApiName: 'collection-search',
       apiDefinition: ApiDefinition.fromInline(
-        withIntegrations({ search: searchFn.functionArn, ask: askFn.functionArn }),
+        withIntegrations(
+          {
+            search: searchFn.functionArn,
+            ask: askFn.functionArn,
+            favourites: favouritesFn.functionArn,
+          },
+          props.userPool.userPoolArn,
+        ),
       ),
       endpointTypes: [EndpointType.REGIONAL],
       // Account-level role that lets API Gateway write logs to CloudWatch (none was set).
@@ -168,6 +207,10 @@ export class ApiStack extends Stack {
       principal: new ServicePrincipal('apigateway.amazonaws.com'),
       sourceArn: api.arnForExecuteApi('POST', '/ask', STAGE),
     });
+    favouritesFn.addPermission('InvokeFromApi', {
+      principal: new ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: api.arnForExecuteApi('*', '/favourites*', STAGE),
+    });
 
     // The key the Astro server sends. Generated into Secrets Manager; the template only holds
     // a {{resolve:secretsmanager:…}} reference, never the value.
@@ -189,6 +232,7 @@ export class ApiStack extends Stack {
       api,
       searchFn,
       askFn,
+      favouritesFn,
       ingestFn: props.search.ingestFn,
       domain,
       askModelId: ASK_PROFILE_ID,
@@ -199,6 +243,7 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'AlarmTopicArn', { value: monitoring.topic.topicArn });
     new CfnOutput(this, 'ApiKeySecretArn', { value: keySecret.secretArn });
     new CfnOutput(this, 'SearchFunctionName', { value: searchFn.functionName });
+    new CfnOutput(this, 'FavouritesTableName', { value: favouritesTable.tableName });
     new CfnOutput(this, 'AskModelArn', { value: askProfileArn });
     new CfnOutput(this, 'GuardrailId', { value: guardrail.guardrailId });
     new CfnOutput(this, 'GuardrailVersion', { value: guardrail.version });
@@ -209,7 +254,10 @@ export class ApiStack extends Stack {
  * openapi.yaml stays a plain contract; the AWS-specific integration details are added here,
  * where the Lambda ARN is known.
  */
-function withIntegrations(functionArns: { search: string; ask: string }) {
+function withIntegrations(
+  functionArns: { search: string; ask: string; favourites: string },
+  userPoolArn: string,
+) {
   const spec = parse(readFileSync(OPENAPI_FILE, 'utf8'));
   const lambdaProxy = (functionArn: string) => ({
     type: 'aws_proxy',
@@ -219,6 +267,13 @@ function withIntegrations(functionArns: { search: string; ask: string }) {
 
   // API Gateway can check required parameters before invoking the Lambda (types and ranges are
   // still validated in the Lambda; the REST validator doesn't check those).
+  // The `cognito` scheme checks access tokens from this user pool: signature, expiry, and the
+  // scope each operation lists. A valid token without that scope is refused.
+  spec.components.securitySchemes.cognito['x-amazon-apigateway-authorizer'] = {
+    type: 'cognito_user_pools',
+    providerARNs: [userPoolArn],
+  };
+
   spec['x-amazon-apigateway-request-validators'] = {
     params: { validateRequestParameters: true, validateRequestBody: false },
     body: { validateRequestParameters: false, validateRequestBody: true },
@@ -230,6 +285,12 @@ function withIntegrations(functionArns: { search: string; ask: string }) {
   // Request bodies are checked against the AskRequest schema before the Lambda (and a model) runs.
   spec.paths['/ask'].post['x-amazon-apigateway-request-validator'] = 'body';
   spec.paths['/ask'].post['x-amazon-apigateway-integration'] = lambdaProxy(functionArns.ask);
+
+  const favourites = lambdaProxy(functionArns.favourites);
+  spec.paths['/favourites'].get['x-amazon-apigateway-integration'] = favourites;
+  spec.paths['/favourites/{objectId}'].put['x-amazon-apigateway-request-validator'] = 'body';
+  spec.paths['/favourites/{objectId}'].put['x-amazon-apigateway-integration'] = favourites;
+  spec.paths['/favourites/{objectId}'].delete['x-amazon-apigateway-integration'] = favourites;
 
   // Answered by API Gateway itself: no Lambda, no cost beyond the request.
   spec.paths['/health'].get['x-amazon-apigateway-integration'] = {

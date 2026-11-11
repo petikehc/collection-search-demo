@@ -34,11 +34,48 @@ export interface paths {
          * Ask a question about the collection (RAG with citations)
          * @description Retrieves relevant collection records from the Bedrock Knowledge Base and has a model
          *     answer from them only, with citations. A Bedrock Guardrail checks the question and the
-         *     answer. Not public: requests must be signed by an IAM principal in the account
-         *     (Cognito sign-in replaces this later).
+         *     answer. Needs a signed-in user's access token with the `ask` scope, and the API key.
          */
         post: operations["askCollection"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/favourites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user's favourite objects, newest first */
+        get: operations["listFavourites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/favourites/{objectId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Museum's object ID (digits only) */
+                objectId: components["parameters"]["ObjectId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Add an object to the signed-in user's favourites (repeating it is harmless) */
+        put: operations["addFavourite"];
+        post?: never;
+        /** Remove an object from the signed-in user's favourites (removing a missing one is harmless) */
+        delete: operations["removeFavourite"];
         options?: never;
         head?: never;
         patch?: never;
@@ -83,6 +120,18 @@ export interface components {
              */
             guardrailAction: "NONE" | "INTERVENED";
             attribution: string;
+        };
+        FavouriteRequest: {
+            title: string;
+        };
+        Favourite: {
+            objectId: string;
+            title: string;
+            /** Format: date-time */
+            addedAt: string;
+        };
+        FavouritesResponse: {
+            favourites: components["schemas"]["Favourite"][];
         };
         Health: {
             /** @enum {string} */
@@ -140,6 +189,20 @@ export interface components {
         };
     };
     responses: {
+        /** @description Missing, expired or invalid access token, or a valid one without the operation's scope (API Gateway checks the token before the API key, so this also wins when both are missing) */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
+        /** @description Valid token, but a missing or invalid API key */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content?: never;
+        };
         /** @description Invalid parameters */
         BadRequest: {
             headers: {
@@ -150,7 +213,10 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        /** @description The Museum's object ID (digits only) */
+        ObjectId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -200,13 +266,8 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            /** @description Request not signed by an allowed IAM principal */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             /** @description Throttled */
             429: {
                 headers: {
@@ -214,6 +275,82 @@ export interface operations {
                 };
                 content?: never;
             };
+        };
+    };
+    listFavourites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The user's favourites */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FavouritesResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    addFavourite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Museum's object ID (digits only) */
+                objectId: components["parameters"]["ObjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FavouriteRequest"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Favourite"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    removeFavourite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The Museum's object ID (digits only) */
+                objectId: components["parameters"]["ObjectId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     searchObjects: {
