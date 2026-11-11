@@ -7,8 +7,8 @@ import type { AstroCookieSetOptions, AstroCookies } from 'astro';
 import { CognitoJwtVerifier } from 'aws-jwt-verify';
 import {
   RESOURCE_SERVER,
-  WEB_CALLBACK_URL,
-  WEB_LOGOUT_URL,
+  webCallbackUrl,
+  webLogoutUrl,
 } from '../../../functions/lib/auth/constants.js';
 import {
   authorizeUrl,
@@ -50,7 +50,12 @@ export function safeReturnTo(value: string | null | undefined): string {
     : '/';
 }
 
-/** Step 1: remember a fresh PKCE verifier and state, then send the user to managed login. */
+/**
+ * Step 1: remember a fresh PKCE verifier and state, then send the user to managed login.
+ * The callback is on whichever origin served this request (localhost or the hosted site). That's
+ * safe: Astro only trusts the hosts in `security.allowedDomains`, and Cognito only redirects to
+ * the callback URLs registered for the client.
+ */
 export async function startLogin(cookies: AstroCookies, url: URL, returnTo: string): Promise<URL> {
   const { loginBaseUrl, clientId } = await getConfig();
   const pkce = createPkce();
@@ -63,7 +68,7 @@ export async function startLogin(cookies: AstroCookies, url: URL, returnTo: stri
   return authorizeUrl({
     baseUrl: loginBaseUrl,
     clientId,
-    redirectUri: WEB_CALLBACK_URL,
+    redirectUri: webCallbackUrl(url.origin),
     scopes: SCOPES,
     state,
     challenge: pkce.challenge,
@@ -90,7 +95,7 @@ export async function finishLogin(cookies: AstroCookies, url: URL): Promise<stri
     baseUrl: config.loginBaseUrl,
     clientId: config.clientId,
     clientSecret: config.clientSecret,
-    redirectUri: WEB_CALLBACK_URL,
+    redirectUri: webCallbackUrl(url.origin),
     code: url.searchParams.get('code') ?? '',
     verifier: login.verifier,
   });
@@ -143,7 +148,7 @@ export async function currentUser(cookies: AstroCookies, url: URL): Promise<User
  * cookies, and end the Cognito session (or managed login would sign the user straight back in).
  * An access token already issued still works at the API until it expires (up to an hour).
  */
-export async function logout(cookies: AstroCookies): Promise<URL> {
+export async function logout(cookies: AstroCookies, url: URL): Promise<URL> {
   const config = await getConfig();
   const refreshToken = cookies.get(COOKIE.refresh)?.value;
   if (refreshToken) {
@@ -158,7 +163,7 @@ export async function logout(cookies: AstroCookies): Promise<URL> {
   return logoutUrl({
     baseUrl: config.loginBaseUrl,
     clientId: config.clientId,
-    logoutUri: WEB_LOGOUT_URL,
+    logoutUri: webLogoutUrl(url.origin),
   });
 }
 

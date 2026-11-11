@@ -81,6 +81,20 @@ describe('NmaClient', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('gives up on a slow request after timeoutMs, without retrying', async () => {
+    let calls = 0;
+    // Never answers: only the abort signal can end it, as with a hung server.
+    const fetch = ((_url: string, init?: RequestInit) => {
+      calls++;
+      return new Promise((_resolve, reject) =>
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason)),
+      );
+    }) as typeof globalThis.fetch;
+    const client = new NmaClient({ fetch, timeoutMs: 20, maxRetries: 3, minIntervalMs: 0 });
+    await expect(client.getObject('1')).rejects.toMatchObject({ name: 'TimeoutError' });
+    expect(calls).toBe(1);
+  });
+
   it('resolves relative links against the base URL and sends the API key when set', async () => {
     const { client, calls } = setup([{}], { apiKey: 'test-key' });
     await client.getPage('object?text=boomerang&limit=2&offset=2');

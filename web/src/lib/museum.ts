@@ -6,8 +6,9 @@ import { NmaClient } from '../../../functions/lib/nma/client.js';
 import { type CollectionObject, normaliseObject } from '../../../functions/lib/nma/normalise.js';
 
 // A page view shouldn't wait out the ingest's long backoff: one retry, then show an error.
+// A slow Museum fails after 5 s rather than holding the request (and a Lambda) for 30.
 // 10 requests a second is the API's per-second limit.
-const client = new NmaClient({ minIntervalMs: 100, maxRetries: 1 });
+const client = new NmaClient({ minIntervalMs: 100, maxRetries: 1, timeoutMs: 5000 });
 
 const MAX_ENTRIES = 500;
 const cache = new Map<string, { object: CollectionObject; expiresAt: number }>();
