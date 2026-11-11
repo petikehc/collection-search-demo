@@ -25,8 +25,9 @@ import {
   CLI_CALLBACK_URL,
   RESOURCE_SERVER,
   SCOPES,
-  WEB_CALLBACK_URL,
-  WEB_LOGOUT_URL,
+  WEB_ORIGINS,
+  webCallbackUrl,
+  webLogoutUrl,
 } from '../../functions/lib/auth/constants.js';
 
 /**
@@ -101,8 +102,8 @@ export class AuthStack extends Stack {
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes,
-        callbackUrls: [WEB_CALLBACK_URL],
-        logoutUrls: [WEB_LOGOUT_URL],
+        callbackUrls: WEB_ORIGINS.map(webCallbackUrl),
+        logoutUrls: WEB_ORIGINS.map(webLogoutUrl),
       },
     });
     const webSecret = new Secret(this, 'WebClientSecret', {

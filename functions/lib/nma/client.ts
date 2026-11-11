@@ -10,6 +10,11 @@ export interface NmaClientOptions {
   minIntervalMs?: number;
   /** Retries for 429, 5xx and network errors before giving up. */
   maxRetries?: number;
+  /**
+   * Gives up on a request that takes longer than this, and doesn't retry it: a slow API won't
+   * get faster by asking again. Unset (the ingest's default) means no limit.
+   */
+  timeoutMs?: number;
   fetch?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
@@ -46,6 +51,7 @@ export class NmaClient {
   private readonly apiKey?: string;
   private readonly minIntervalMs: number;
   private readonly maxRetries: number;
+  private readonly timeoutMs: number | undefined;
   private readonly fetch: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => number;
@@ -57,6 +63,7 @@ export class NmaClient {
     this.apiKey = options.apiKey;
     this.minIntervalMs = options.minIntervalMs ?? 1000;
     this.maxRetries = options.maxRetries ?? 5;
+    this.timeoutMs = options.timeoutMs;
     this.fetch = options.fetch ?? globalThis.fetch;
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.now = options.now ?? Date.now;
@@ -117,9 +124,11 @@ export class NmaClient {
 
       let res: Response;
       try {
-        res = await this.fetch(url, { headers });
+        const signal = this.timeoutMs ? AbortSignal.timeout(this.timeoutMs) : undefined;
+        res = await this.fetch(url, { headers, signal });
       } catch (err) {
-        if (attempt >= this.maxRetries) throw err;
+        const timedOut = err instanceof Error && err.name === 'TimeoutError';
+        if (timedOut || attempt >= this.maxRetries) throw err;
         await this.sleep(this.backoff(attempt));
         continue;
       }

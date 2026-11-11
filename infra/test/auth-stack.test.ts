@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { App } from 'aws-cdk-lib';
 import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
+import { WEB_DOMAIN } from '../../functions/lib/auth/constants.js';
 import { AuthStack } from '../lib/auth-stack.js';
 
 const { context } = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf8'));
@@ -40,13 +41,19 @@ describe('AuthStack', () => {
     });
   });
 
-  it('allows only the authorisation code grant, on localhost, for both clients', () => {
+  it('sends the web client back only to localhost or the hosted site, over HTTPS there', () => {
+    expect(client('web')?.CallbackURLs).toEqual([
+      'http://localhost:4321/auth/callback',
+      `https://${WEB_DOMAIN}/auth/callback`,
+    ]);
+    expect(client('web')?.LogoutURLs).toEqual(['http://localhost:4321/', `https://${WEB_DOMAIN}/`]);
+    expect(client('cli')?.CallbackURLs).toEqual(['http://localhost:8976/callback']);
+  });
+
+  it('allows only the authorisation code grant for both clients', () => {
     for (const c of clients) {
       expect(c.AllowedOAuthFlows).toEqual(['code']);
       expect(c.SupportedIdentityProviders).toEqual(['COGNITO']);
-      for (const url of [...c.CallbackURLs, ...(c.LogoutURLs ?? [])]) {
-        expect(url).toMatch(/^http:\/\/localhost:\d+\//);
-      }
       // Resource-server scopes are `<identifier>/<scope>`, built from a reference to the server.
       const server = { Ref: expect.stringMatching(/^UsersApi/) };
       expect(c.AllowedOAuthScopes).toEqual([
