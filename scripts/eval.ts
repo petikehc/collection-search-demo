@@ -16,6 +16,7 @@ import {
 } from '@aws-sdk/client-bedrock-agent-runtime';
 import { BedrockRuntimeClient, ConverseCommand } from '@aws-sdk/client-bedrock-runtime';
 import { type AskConfig, askCollection, buildRequest } from '../functions/lib/ask/ask.js';
+import { expandQuestion } from '../functions/lib/ask/expand.js';
 import {
   type CaseResult,
   type EvalCase,
@@ -56,7 +57,7 @@ for (const c of cases) {
   const started = Date.now();
   // The same retrieval RetrieveAndGenerate does, to see everything retrieved (citations only
   // show what the model chose to use) and to give the judge the passages the model saw.
-  const retrieved = await retrieve(c.question);
+  const retrieved = await retrieve(expandQuestion(c.question));
   const res = await askCollection(agent, c.question, config);
   const blocked = res.guardrailAction === 'INTERVENED';
   const retrievedIds = retrieved.map((r) => String(r.metadata?.objectId ?? ''));

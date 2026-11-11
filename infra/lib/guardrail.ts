@@ -3,9 +3,13 @@ import { Stack } from 'aws-cdk-lib';
 import { CfnGuardrail, type CfnGuardrailProps, CfnGuardrailVersion } from 'aws-cdk-lib/aws-bedrock';
 import { Construct } from 'constructs';
 
-/** Thresholds for the contextual grounding check; to be calibrated with the eval set. */
-export const GROUNDING_THRESHOLD = 0.7;
-export const RELEVANCE_THRESHOLD = 0.5;
+/**
+ * Contextual grounding thresholds, calibrated with the eval set (docs/adr/0008). The first guesses
+ * (0.7 and 0.5) blocked good answers scoring 0.61 grounding or 0.33 relevance, while the real
+ * failures scored at most 0.12 and 0.02; these values sit in that gap.
+ */
+export const GROUNDING_THRESHOLD = 0.5;
+export const RELEVANCE_THRESHOLD = 0.2;
 
 const filter = (type: string, inputStrength: string, outputStrength: string) => ({
   type,

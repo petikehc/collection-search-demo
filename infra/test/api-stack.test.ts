@@ -166,8 +166,8 @@ describe('ApiStack guardrail', () => {
 
   it('checks grounding and relevance of answers', () => {
     expect(props.ContextualGroundingPolicyConfig.FiltersConfig).toEqual([
-      { Type: 'GROUNDING', Threshold: 0.7 },
-      { Type: 'RELEVANCE', Threshold: 0.5 },
+      { Type: 'GROUNDING', Threshold: 0.5 },
+      { Type: 'RELEVANCE', Threshold: 0.2 },
     ]);
   });
 
