@@ -15,6 +15,7 @@ import { Tracing } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { LogGroup } from 'aws-cdk-lib/aws-logs';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
+import type { Topic } from 'aws-cdk-lib/aws-sns';
 import type { Construct } from 'constructs';
 import { parse } from 'yaml';
 import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
@@ -45,6 +46,11 @@ export interface ApiStackProps extends StackProps {
  * REST (not HTTP) API because usage plans, API keys and request validation are REST-only.
  */
 export class ApiStack extends Stack {
+  /** For the hosted web front end (WebStack). */
+  readonly apiUrl: string;
+  readonly apiKeySecret: Secret;
+  readonly alarmTopic: Topic;
+
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, { description: 'Collection search: API Gateway and Lambdas', ...props });
     const { domain, adminRole, openSearchRoles } = props.search;
@@ -238,6 +244,10 @@ export class ApiStack extends Stack {
       askModelId: ASK_PROFILE_ID,
       metricsNamespace: METRICS_NAMESPACE,
     });
+
+    this.apiUrl = api.url;
+    this.apiKeySecret = keySecret;
+    this.alarmTopic = monitoring.topic;
 
     new CfnOutput(this, 'ApiUrl', { value: api.url });
     new CfnOutput(this, 'AlarmTopicArn', { value: monitoring.topic.topicArn });

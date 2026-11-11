@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 import { buildApp, PROJECT_TAGS } from '../lib/app.js';
 
 // Use the same feature flags as `cdk synth`, so tests can't pass on different behaviour.
-const { context } = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf8'));
+const { context: flags } = JSON.parse(
+  readFileSync(new URL('../cdk.json', import.meta.url), 'utf8'),
+);
+// No asset bundling: these tests don't need the Lambda or Astro builds (`pnpm synth` runs them).
+const context = { ...flags, 'aws:cdk:bundling-stacks': [] };
 
 describe('CDK app', () => {
   it('tags every stack with the project tags', () => {

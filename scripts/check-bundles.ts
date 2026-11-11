@@ -1,12 +1,21 @@
 /**
  * Loads every synthesised Lambda bundle in a clean Node process, in an empty directory with no
- * node_modules, like the Lambda runtime does. Catches "Cannot find module" errors that unit
- * tests miss (they run the TypeScript with every dependency installed).
+ * node_modules, like the Lambda runtime does, and starts the web front end's server the same way.
+ * Catches "Cannot find module" errors that unit tests miss (they run the TypeScript with every
+ * dependency installed).
  *
  *   pnpm check:bundles      # synthesises first
  */
-import { spawnSync } from 'node:child_process';
-import { copyFileSync, existsSync, mkdtempSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import {
+  copyFileSync,
+  cpSync,
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  statSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -55,3 +64,33 @@ for (const asset of assets) {
 
 console.log(`\n${assets.length - failures}/${assets.length} bundles load`);
 if (failures) process.exitCode = 1;
+
+// The web front end's asset (WebStack): start its Astro server the way the Lambda Web Adapter
+// does, from a copy with no node_modules and no AWS credentials, and request a page. A 404 for an
+// unknown path proves the server starts and renders without anything outside the bundle.
+const web = readdirSync(CDK_OUT).find((d) => existsSync(join(CDK_OUT, d, 'run.sh')));
+if (!web) throw new Error('No web front end asset found: run `pnpm synth` first');
+const webDir = mkdtempSync(join(tmpdir(), 'web-check-'));
+cpSync(join(CDK_OUT, web), webDir, { recursive: true });
+const port = 18080;
+const server = spawn(process.execPath, ['dist/server/entry.mjs'], {
+  cwd: webDir,
+  env: { PATH: ENV.PATH, PORT: String(port), HOST: '127.0.0.1', NODE_ENV: 'production' },
+  stdio: 'ignore',
+});
+try {
+  let status = 0;
+  for (let i = 0; i < 50 && !status; i++) {
+    status = await fetch(`http://127.0.0.1:${port}/bundle-check`)
+      .then((r) => r.status)
+      .catch(() => new Promise<number>((resolve) => setTimeout(() => resolve(0), 200)));
+  }
+  const ok = status === 404;
+  if (!ok) process.exitCode = 1;
+  console.log(
+    `${ok ? 'PASS' : 'FAIL'}  web front end server  (GET /bundle-check → ${status || 'no answer'})`,
+  );
+} finally {
+  server.kill();
+  rmSync(webDir, { recursive: true, force: true });
+}

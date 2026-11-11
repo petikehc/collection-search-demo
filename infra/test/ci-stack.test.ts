@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest';
 import { buildApp } from '../lib/app.js';
 import { CiStack } from '../lib/ci-stack.js';
 
-const { context } = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf8'));
+const { context: flags } = JSON.parse(
+  readFileSync(new URL('../cdk.json', import.meta.url), 'utf8'),
+);
+// No asset bundling: these tests don't need the Lambda or Astro builds (`pnpm synth` runs them).
+const context = { ...flags, 'aws:cdk:bundling-stacks': [] };
 const env = { account: '111111111111', region: 'ap-southeast-2' };
 
 describe('CiStack', () => {

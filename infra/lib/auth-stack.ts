@@ -37,6 +37,9 @@ import {
  */
 export class AuthStack extends Stack {
   readonly userPool: UserPool;
+  /** For the hosted web front end (WebStack). */
+  readonly loginBaseUrl: string;
+  readonly webClientSecret: Secret;
 
   constructor(scope: Construct, id: string, props: StackProps) {
     super(scope, id, { description: 'Collection search: Cognito sign-in', ...props });
@@ -140,6 +143,9 @@ export class AuthStack extends Stack {
       });
       style.node.addDependency(domain);
     }
+
+    this.loginBaseUrl = domain.baseUrl();
+    this.webClientSecret = webSecret;
 
     new CfnOutput(this, 'UserPoolId', { value: this.userPool.userPoolId });
     new CfnOutput(this, 'Issuer', { value: this.userPool.userPoolProviderUrl });

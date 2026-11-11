@@ -7,6 +7,7 @@ import { CiStack } from './ci-stack.js';
 import { DomainStack } from './domain-stack.js';
 import { LogGroupDefaults } from './log-group-defaults.js';
 import { SearchStack } from './search-stack.js';
+import { WebStack } from './web-stack.js';
 
 export const PROJECT_TAGS = { project: 'collection-search-demo', 'managed-by': 'cdk' };
 
@@ -26,13 +27,28 @@ export function buildApp(app = new App()): App {
   const ai = new AiStack(app, 'CollectionSearch-Ai', { env, tags: PROJECT_TAGS, search });
   const auth = new AuthStack(app, 'CollectionSearch-Auth', { env, tags: PROJECT_TAGS });
   // Kept by teardown, so the hand-made DNS records stay valid across rebuilds.
-  new DomainStack(app, 'CollectionSearch-Domain', { env, tags: PROJECT_TAGS, domain: WEB_DOMAIN });
-  new ApiStack(app, 'CollectionSearch-Api', {
+  const domain = new DomainStack(app, 'CollectionSearch-Domain', {
+    env,
+    tags: PROJECT_TAGS,
+    domain: WEB_DOMAIN,
+  });
+  const api = new ApiStack(app, 'CollectionSearch-Api', {
     env,
     tags: PROJECT_TAGS,
     search,
     ai,
     userPool: auth.userPool,
+  });
+  new WebStack(app, 'CollectionSearch-Web', {
+    env,
+    tags: PROJECT_TAGS,
+    apiUrl: api.apiUrl,
+    apiKeySecret: api.apiKeySecret,
+    userPoolId: auth.userPool.userPoolId,
+    loginBaseUrl: auth.loginBaseUrl,
+    webClientSecret: auth.webClientSecret,
+    domainName: domain.domainName,
+    alarmTopic: api.alarmTopic,
   });
 
   // The deploy role for GitHub Actions, deployed by hand with `-c githubSubjectPrefix=…` (see
