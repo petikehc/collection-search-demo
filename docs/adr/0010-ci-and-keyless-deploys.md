@@ -60,4 +60,4 @@ The `Ci` stack is deployed once by hand, and `pnpm teardown` keeps it. The deplo
   - branch protection on `main`: pull requests only, CI must pass, a review;
   - a GitHub environment with required reviewers, with the trust condition switched to `environment:<name>`;
   - a narrower bootstrap execution policy (`cdk bootstrap --cloudformation-execution-policies`).
-- **Not covered:** multi-account promotion (dev → prod) and deploying the web front end, which runs locally (README).
+- **Not covered:** multi-account promotion (dev → prod). The deploy workflow also deploys the hosted web front end (ADR 13).

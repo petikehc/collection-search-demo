@@ -41,7 +41,7 @@ What we need:
 Both clients:
 
 - allow only the authorisation code grant (no implicit grant, which puts tokens in URLs);
-- allow only localhost callback URLs;
+- allow only localhost callback URLs (the hosted site's HTTPS URL was added later: ADR 13);
 - issue access tokens that last 1 hour and refresh tokens that last 1 day.
 
 **Authorisation by scope, at the gateway.** A resource server `collection-search` defines two scopes, `ask` and `favourites`. Each API operation lists the scope it needs in `openapi.yaml`, and API Gateway's Cognito authoriser checks it before any Lambda runs:
@@ -80,5 +80,5 @@ A missing scope is a **401, not a 403**: API Gateway's Cognito authoriser treats
 - **Demo-only settings to change for production:**
   - The user pool's removal policy is DESTROY with no deletion protection. In production: RETAIN plus deletion protection, since losing a user pool loses every account.
   - MFA is off. In production: required (TOTP or passkeys), which managed login handles without code changes.
-  - Callback URLs are localhost only. A deployed site adds its HTTPS URL.
+  - Callback URLs were localhost only. The hosted site added its HTTPS URL (ADR 13).
 - **Machine clients:** the client credentials grant (for a partner system) would be a third client. Cognito charges per token request for that grant, with no free tier, so we didn't add one.
