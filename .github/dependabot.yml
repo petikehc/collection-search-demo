@@ -27,3 +27,10 @@ updates:
         patterns: ["aws-cdk", "aws-cdk-lib"]
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Types must match the Node major the Lambdas run (NODEJS_24_X, .nvmrc).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # A new compiler major is a deliberate upgrade, once Astro's checker supports it.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
