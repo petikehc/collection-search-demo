@@ -29,7 +29,7 @@ export async function handler() {
   const result = await reindex(client, objects.map(toSearchDocument));
 
   // After the index swap: if this fails, search is already updated and the next run retries.
-  const kbFiles = await syncKbFiles(
+  const kbSync = await syncKbFiles(
     new S3Client({}),
     process.env.DOCS_BUCKET ?? '',
     objects.flatMap(toKbFiles),
@@ -37,7 +37,7 @@ export async function handler() {
 
   const summary = {
     ...result,
-    kbFiles,
+    kbSync,
     fetched: raw.length,
     dropped: raw.length - objects.length,
     seconds: Math.round((Date.now() - started) / 1000),

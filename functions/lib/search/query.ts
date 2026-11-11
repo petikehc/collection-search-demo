@@ -7,8 +7,12 @@ export const ATTRIBUTION =
   "This application was developed using the National Museum of Australia's Collection API. " +
   'Collection metadata © National Museum of Australia, CC BY-NC 4.0.';
 
-/** Fields searched, with boosts: a title match matters most, the collection-level statement least. */
+/**
+ * Fields searched, with boosts: an exact accession number (a keyword field, so only a whole-value
+ * match counts) beats everything; then title; the collection-level statement counts least.
+ */
 export const SEARCH_FIELDS = [
+  'accessionNumber^10',
   'title^4',
   'types^3',
   'places^2',

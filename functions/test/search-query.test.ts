@@ -42,6 +42,13 @@ describe('buildSearchBody', () => {
     });
   });
 
+  it('includes the accession number, so staff can look an object up by its number', () => {
+    const body = buildSearchBody({ ...defaults, q: '2016.0013.0001' });
+    expect(body.query.bool.must[0]).toMatchObject({
+      multi_match: { fields: expect.arrayContaining(['accessionNumber^10']) },
+    });
+  });
+
   it('browses everything when the query is only stop words', () => {
     const body = buildSearchBody({ ...defaults, q: 'the' });
     expect(body.query.bool.must[0]).toMatchObject({ multi_match: { zero_terms_query: 'all' } });
