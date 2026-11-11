@@ -6,7 +6,8 @@ import objectsIndex from './objects-index.json' with { type: 'json' };
 /** Mappings, analysers and synonyms. JSON imports widen string literals, hence the cast. */
 const indexDefinition = objectsIndex as API.Indices_Create_RequestBody;
 
-export type SearchDocument = CollectionObject & { hasImage: boolean };
+/** `embedding` is the object's vector for hybrid search; an object without one is keyword-only. */
+export type SearchDocument = CollectionObject & { hasImage: boolean; embedding?: number[] };
 
 export interface ReindexResult {
   index: string;
@@ -15,8 +16,8 @@ export interface ReindexResult {
   deleted: string[];
 }
 
-export function toSearchDocument(obj: CollectionObject): SearchDocument {
-  return { ...obj, hasImage: obj.images.length > 0 };
+export function toSearchDocument(obj: CollectionObject, embedding?: number[]): SearchDocument {
+  return { ...obj, hasImage: obj.images.length > 0, ...(embedding && { embedding }) };
 }
 
 /** e.g. objects-20261111093000 (UTC), so names sort by creation time. */
@@ -58,7 +59,9 @@ export async function reindex(
 ): Promise<ReindexResult> {
   const alias = options.alias ?? OBJECTS_ALIAS;
   const index = newIndexName(alias, options.now);
-  const batchSize = options.batchSize ?? 500;
+  // Each document carries a 1,024-number vector (about 12 KB as JSON): 200 keeps a request
+  // well under the domain's 10 MB limit.
+  const batchSize = options.batchSize ?? 200;
 
   await client.indices.create({ index, body: indexDefinition });
   let previous: string[];

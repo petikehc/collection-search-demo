@@ -28,7 +28,8 @@
     "ask": "tsx scripts/ask.ts",
     "call": "tsx scripts/call.ts",
     "user:create": "tsx scripts/user-create.ts",
-    "eval": "tsx scripts/eval.ts"
+    "eval": "tsx scripts/eval.ts",
+    "eval:search": "tsx scripts/eval-search.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

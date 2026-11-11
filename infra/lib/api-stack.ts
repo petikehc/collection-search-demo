@@ -24,7 +24,7 @@ import { AskGuardrail } from './guardrail.js';
 import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
 import { Monitoring } from './monitoring.js';
 import { FUNCTIONS_DIR, OpenSearchRole } from './opensearch-role.js';
-import type { SearchStack } from './search-stack.js';
+import { embeddingModelArn, type SearchStack } from './search-stack.js';
 
 export const STAGE = 'v1';
 
@@ -61,7 +61,7 @@ export class ApiStack extends Stack {
     const guardrail = new AskGuardrail(this, 'AskGuardrail');
 
     const searchFn = new NodejsFunction(this, 'SearchFunction', {
-      description: 'GET /search: queries the objects alias in OpenSearch',
+      description: 'GET /search: hybrid keyword and vector search over the objects alias',
       ...LAMBDA_DEFAULTS,
       entry: `${FUNCTIONS_DIR}search/handler.ts`,
       memorySize: 512,
@@ -75,6 +75,14 @@ export class ApiStack extends Stack {
         POWERTOOLS_METRICS_NAMESPACE: 'CollectionSearch',
       },
     });
+
+    // Embeds the query for hybrid search: this one model, in this region, nothing else.
+    searchFn.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: [embeddingModelArn(this)],
+      }),
+    );
 
     // Read-only at both locks: IAM allows only searches on the alias, FGAC allows only `read`.
     new OpenSearchRole(this, 'SearchReaderRole', {

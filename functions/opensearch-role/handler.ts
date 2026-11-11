@@ -21,6 +21,15 @@ export interface OpenSearchIndexProps {
   Definition: string;
 }
 
+/** Properties set by the OpenSearchSearchPipeline construct (infra/lib/opensearch-role.ts). */
+export interface OpenSearchSearchPipelineProps {
+  Endpoint: string;
+  AdminRoleArn: string;
+  PipelineName: string;
+  /** JSON string, so CloudFormation doesn't turn numbers into strings. */
+  Definition: string;
+}
+
 type Event = CloudFormationCustomResourceEvent;
 type HttpError = { meta?: { statusCode?: number } };
 
@@ -31,7 +40,8 @@ const ignore = (status: number) => (err: HttpError) => {
 /**
  * Custom resources (via the CDK Provider framework) for the parts of OpenSearch that
  * CloudFormation can't manage: fine-grained access control roles and mappings
- * (Custom::OpenSearchRole) and indices that other services write to (Custom::OpenSearchIndex).
+ * (Custom::OpenSearchRole), indices that other services write to (Custom::OpenSearchIndex) and
+ * search pipelines (Custom::OpenSearchSearchPipeline).
  * Requests are signed as the admin role, the only principal allowed to change these.
  */
 export async function handler(event: Event) {
@@ -41,9 +51,31 @@ export async function handler(event: Event) {
     region: process.env.AWS_REGION ?? '',
     assumeRoleArn: AdminRoleArn,
   });
-  return event.ResourceType === 'Custom::OpenSearchIndex'
-    ? handleIndex(client, event)
-    : handleRole(client, event);
+  if (event.ResourceType === 'Custom::OpenSearchIndex') return handleIndex(client, event);
+  if (event.ResourceType === 'Custom::OpenSearchSearchPipeline') {
+    return handleSearchPipeline(client, event);
+  }
+  return handleRole(client, event);
+}
+
+/** A search pipeline can be replaced in place: PUT is create-or-update. */
+async function handleSearchPipeline(client: Client, event: Event) {
+  const props = event.ResourceProperties as unknown as OpenSearchSearchPipelineProps;
+  const path = (name: string) => `/_search/pipeline/${encodeURIComponent(name)}`;
+
+  if (event.RequestType === 'Delete') {
+    await client.transport
+      .request({ method: 'DELETE', path: path(event.PhysicalResourceId) })
+      .catch(ignore(404));
+    return { PhysicalResourceId: event.PhysicalResourceId };
+  }
+  await client.transport.request({
+    method: 'PUT',
+    path: path(props.PipelineName),
+    body: props.Definition,
+  });
+  // A new physical ID on rename makes CloudFormation delete the old pipeline afterwards.
+  return { PhysicalResourceId: props.PipelineName };
 }
 
 async function handleRole(client: Client, event: Event) {

@@ -148,6 +148,17 @@ paths:
         - name: yearTo
           in: query
           schema: { type: integer, minimum: 0, maximum: 2100 }
+        - name: hasImage
+          in: query
+          description: Only objects with (true) or without (false) an image in the Museum's data.
+          schema: { type: boolean }
+        - name: mode
+          in: query
+          description: >-
+            `hybrid` (default) ranks keyword matches together with the objects nearest in meaning,
+            so questions and misspellings still find related objects. It applies when `q` is set,
+            and only the best 200 matches can be paged through. `keyword` matches words only.
+          schema: { type: string, enum: [hybrid, keyword], default: hybrid }
         - name: page
           in: query
           schema: { type: integer, minimum: 1, maximum: 100, default: 1 }
@@ -271,9 +282,20 @@ components:
 
     SearchResponse:
       type: object
-      required: [total, page, size, results, facets, attribution]
+      required: [total, keywordTotal, mode, page, size, results, facets, attribution]
       properties:
         total: { type: integer, description: "Total matching objects (exact up to 10,000)" }
+        keywordTotal:
+          type: integer
+          description: >-
+            How many of `total` match the query's words. In a hybrid search the rest are related
+            by meaning only; in a keyword search it equals `total`.
+        mode:
+          type: string
+          enum: [hybrid, keyword]
+          description: >-
+            How this search ran. A hybrid request falls back to `keyword` when there is no `q`,
+            or if the query couldn't be embedded.
         page: { type: integer }
         size: { type: integer }
         results:

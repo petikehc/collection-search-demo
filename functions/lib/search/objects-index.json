@@ -2,7 +2,11 @@
   "settings": {
     "index": {
       "number_of_shards": 1,
-      "number_of_replicas": 0
+      "number_of_replicas": 0,
+      "knn": true,
+      "search": {
+        "default_pipeline": "objects-hybrid"
+      }
     },
     "analysis": {
       "filter": {
@@ -191,6 +195,15 @@
       },
       "retrievedAt": {
         "type": "date"
+      },
+      "embedding": {
+        "type": "knn_vector",
+        "dimension": 1024,
+        "method": {
+          "name": "hnsw",
+          "engine": "faiss",
+          "space_type": "innerproduct"
+        }
       }
     }
   }

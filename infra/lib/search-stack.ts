@@ -14,9 +14,19 @@ import { Schedule, ScheduleExpression } from 'aws-cdk-lib/aws-scheduler';
 import { LambdaInvoke } from 'aws-cdk-lib/aws-scheduler-targets';
 import type { Construct } from 'constructs';
 import { KB_PREFIX } from '../../functions/lib/kb/documents.js';
-import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
+import {
+  EMBEDDING_MODEL_ID,
+  HYBRID_PIPELINE,
+  HYBRID_WEIGHTS,
+  OBJECTS_ALIAS,
+} from '../../functions/lib/search/constants.js';
 import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
-import { FUNCTIONS_DIR, OpenSearchRole, OpenSearchRoleProvider } from './opensearch-role.js';
+import {
+  FUNCTIONS_DIR,
+  OpenSearchRole,
+  OpenSearchRoleProvider,
+  OpenSearchSearchPipeline,
+} from './opensearch-role.js';
 
 export const DOMAIN_NAME = 'collection-search';
 export const DATA_NODE_INSTANCE_TYPE = 'm7g.medium.search';
@@ -111,6 +121,32 @@ export class SearchStack extends Stack {
       adminRole: this.adminRole,
     });
 
+    // Hybrid search: each half of a hybrid query scores on its own scale (BM25 is unbounded,
+    // vector similarity isn't), so the pipeline puts both on one scale and takes a weighted
+    // mean. L2 with these weights kept exact keyword matches on top where min-max didn't
+    // (docs/adr/0014-one-box-and-hybrid-search.md). The objects index names this pipeline as
+    // its default, so it must exist before the first ingest.
+    new OpenSearchSearchPipeline(this, 'HybridPipeline', {
+      provider: this.openSearchRoles,
+      domain: this.domain,
+      adminRole: this.adminRole,
+      pipelineName: HYBRID_PIPELINE,
+      definition: {
+        description: 'Combines keyword and vector scores for hybrid search',
+        phase_results_processors: [
+          {
+            'normalization-processor': {
+              normalization: { technique: 'l2' },
+              combination: {
+                technique: 'arithmetic_mean',
+                parameters: { weights: HYBRID_WEIGHTS },
+              },
+            },
+          },
+        ],
+      },
+    });
+
     // Private, encrypted, TLS-only. SSE-S3 (not KMS) keeps ETags equal to the MD5 of the content,
     // which the ingest uses to skip unchanged files. Emptied and deleted with the stack.
     this.docsBucket = new Bucket(this, 'DocsBucket', {
@@ -141,6 +177,13 @@ export class SearchStack extends Stack {
       }),
     });
     this.ingestFn = ingest;
+    // Embeds each object for hybrid search: this one model, in this region, nothing else.
+    ingest.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['bedrock:InvokeModel'],
+        resources: [embeddingModelArn(this)],
+      }),
+    );
 
     // List, read, write and delete under kb/ only.
     this.docsBucket.grantReadWrite(ingest, `${KB_PREFIX}*`);
@@ -181,4 +224,14 @@ export class SearchStack extends Stack {
     new CfnOutput(this, 'DomainArn', { value: this.domain.domainArn });
     new CfnOutput(this, 'AdminRoleArn', { value: this.adminRole.roleArn });
   }
+}
+
+/** Titan Text Embeddings V2 in the stack's own region (Sydney): embeddings don't leave it. */
+export function embeddingModelArn(stack: Stack): string {
+  return stack.formatArn({
+    service: 'bedrock',
+    account: '',
+    resource: 'foundation-model',
+    resourceName: EMBEDDING_MODEL_ID,
+  });
 }
