@@ -24,7 +24,8 @@
     "kb:sync": "tsx scripts/kb-sync.ts",
     "kb:retrieve": "tsx scripts/kb-retrieve.ts",
     "guardrail:test": "tsx scripts/guardrail-test.ts",
-    "ask": "tsx scripts/ask.ts"
+    "ask": "tsx scripts/ask.ts",
+    "eval": "tsx scripts/eval.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
