@@ -22,6 +22,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
   response.headers.set('referrer-policy', 'strict-origin-when-cross-origin');
   // Never framed by another site (clickjacking).
   response.headers.set('x-frame-options', 'DENY');
+  // Hosted over HTTPS only: browsers should never try plain http for a year (not on localhost).
+  if (url.protocol === 'https:') {
+    response.headers.set('strict-transport-security', 'max-age=31536000');
+  }
   // Signed-in pages are personal: keep them out of shared caches and the back/forward cache.
   if (locals.user) response.headers.set('cache-control', 'private, no-store');
   return response;

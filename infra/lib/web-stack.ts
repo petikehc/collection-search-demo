@@ -81,7 +81,8 @@ export class WebStack extends Stack {
       environment: {
         AWS_LAMBDA_EXEC_WRAPPER: '/opt/bootstrap',
         PORT,
-        // IPv4 loopback, where the adapter connects (`localhost` may resolve to ::1).
+        // For Astro: listen on IPv4 loopback, where the adapter connects (`localhost` may
+        // resolve to ::1). The adapter also reads HOST and logs a deprecation warning: expected.
         HOST: '127.0.0.1',
         // Ready once the port is open: an HTTP check of `/` would render a page (and search).
         AWS_LWA_READINESS_CHECK_PROTOCOL: 'tcp',
