@@ -12,9 +12,16 @@ const GITHUB_OIDC_URL = 'https://token.actions.githubusercontent.com';
 const BOOTSTRAP_QUALIFIER = 'hnb659fds';
 
 export interface CiStackProps extends StackProps {
-  /** `owner/name` of the GitHub repository allowed to deploy. */
-  githubRepo: string;
+  /**
+   * The repository allowed to deploy, as GitHub writes it at the start of the token's `sub`:
+   * `repo:owner@ownerId/name@repoId` with immutable subjects (GitHub's default for new repos),
+   * or `repo:owner/name`. Read it with
+   * `gh api repos/OWNER/NAME/actions/oidc/customization/sub --jq .sub_claim_prefix`.
+   */
+  githubSubjectPrefix: string;
 }
+
+const SUBJECT_PREFIX = /^repo:[\w.-]+(@\d+)?\/[\w.-]+(@\d+)?$/;
 
 /**
  * Lets GitHub Actions deploy this app without stored AWS keys: a workflow run on `main` of one
@@ -24,8 +31,9 @@ export interface CiStackProps extends StackProps {
 export class CiStack extends Stack {
   constructor(scope: Construct, id: string, props: CiStackProps) {
     super(scope, id, { description: 'Collection search: GitHub Actions deploy role', ...props });
-    if (!/^[\w.-]+\/[\w.-]+$/.test(props.githubRepo)) {
-      throw new Error(`githubRepo must be owner/name, got "${props.githubRepo}"`);
+    const prefix = props.githubSubjectPrefix;
+    if (!SUBJECT_PREFIX.test(prefix)) {
+      throw new Error(`githubSubjectPrefix must be repo:owner/name, got "${prefix}"`);
     }
 
     // An account can have only one provider for this URL. This account had none; where one exists,
@@ -37,13 +45,14 @@ export class CiStack extends Stack {
 
     // Only a workflow run on this repository's main branch can assume the role: not a fork,
     // a pull request or another branch. `sub` is set by GitHub and can't be chosen by the workflow.
+    // With immutable subjects, the IDs also keep out a repository re-created under the same name.
     const role = new Role(this, 'DeployRole', {
-      description: `GitHub Actions deploys from ${props.githubRepo} (main only)`,
+      description: `GitHub Actions deploys from ${prefix} (main only)`,
       maxSessionDuration: Duration.hours(1),
       assumedBy: new OpenIdConnectPrincipal(github, {
         StringEquals: {
           'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
-          'token.actions.githubusercontent.com:sub': `repo:${props.githubRepo}:ref:refs/heads/main`,
+          'token.actions.githubusercontent.com:sub': `${prefix}:ref:refs/heads/main`,
         },
       }),
     });
