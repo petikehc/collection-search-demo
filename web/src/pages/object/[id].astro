@@ -1,0 +1,126 @@
+---
+import Base from '../../layouts/Base.astro';
+import { listFavourites } from '../../lib/api.js';
+import { getObject } from '../../lib/museum.js';
+
+const id = Astro.params.id ?? '';
+if (!/^[0-9]{1,12}$/.test(id)) return new Response('Not found', { status: 404 });
+const { user } = Astro.locals;
+
+// The record and (if signed in) whether it's a favourite, fetched in parallel.
+const [objectResult, favouritesResult] = await Promise.allSettled([
+  getObject(id),
+  user ? listFavourites(user.accessToken) : Promise.resolve([]),
+]);
+const object = objectResult.status === 'fulfilled' ? objectResult.value : null;
+const unavailable = objectResult.status === 'rejected';
+if (unavailable) console.error('museum lookup failed', objectResult.reason);
+if (!object && !unavailable) Astro.response.status = 404;
+if (unavailable) Astro.response.status = 502;
+
+// If favourites can't be read, offer "Add": adding again is harmless.
+const isFavourite =
+  favouritesResult.status === 'fulfilled' && favouritesResult.value.some((f) => f.objectId === id);
+const facts = object
+  ? ([
+      ['Type', object.types.join(', ')],
+      ['Date', object.dateLabel],
+      ['Place', object.places.join('; ')],
+      ['Made by', object.creators.join('; ')],
+      ['Materials', object.materials.join(', ')],
+      ['Collection', object.collection],
+      ['Accession number', object.accessionNumber],
+    ].filter(([, value]) => value) as [string, string][])
+  : [];
+const retrieved = object
+  ? new Date(object.retrievedAt).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })
+  : '';
+---
+
+<Base title={object?.title ?? 'Object not found'}>
+  {unavailable && <p class="error" role="alert">The Museum's Collection API isn't responding. Please try again shortly.</p>}
+  {!object && !unavailable && (
+    <>
+      <h1>Object not found</h1>
+      <p>The Museum may have withdrawn this record. <a href="/">Back to search</a></p>
+    </>
+  )}
+  {
+    object && (
+      <article>
+        <h1>{object.title}</h1>
+        <p>
+          <a href={object.sourceUrl}>View this record on the National Museum of Australia's website</a>
+        </p>
+
+        {user ? (
+          isFavourite ? (
+            <form method="post" action="/favourites">
+              <span>In your <a href="/favourites">favourites</a>.</span>{' '}
+              <input type="hidden" name="action" value="remove" />
+              <input type="hidden" name="objectId" value={object.id} />
+              <input type="hidden" name="returnTo" value={`/object/${object.id}`} />
+              <button type="submit" class="secondary">Remove</button>
+            </form>
+          ) : (
+            <form method="post" action="/favourites">
+              <input type="hidden" name="action" value="add" />
+              <input type="hidden" name="objectId" value={object.id} />
+              <input type="hidden" name="title" value={object.title.slice(0, 300)} />
+              <input type="hidden" name="returnTo" value={`/object/${object.id}`} />
+              <button type="submit" class="secondary">Add to favourites</button>
+            </form>
+          )
+        ) : (
+          <p class="muted">
+            <a href={`/auth/login?returnTo=${encodeURIComponent(Astro.url.pathname)}`}>Sign in</a> to save favourites.
+          </p>
+        )}
+
+        {object.images.length > 0 && (
+          <div class="object-images">
+            {object.images.slice(0, 4).map((image) => (
+              <figure>
+                {/* Hotlinked from the Museum, never copied: its terms require this. */}
+                <img src={image.previewUrl ?? image.thumbnailUrl} alt="" loading="lazy" />
+                <figcaption>
+                  {image.rightsUrl ? <a href={image.rightsUrl}>{image.rightsTitle}</a> : image.rightsTitle}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        )}
+
+        <dl class="facts">
+          {facts.map(([label, value]) => (
+            <>
+              <dt>{label}</dt>
+              <dd>{value}</dd>
+            </>
+          ))}
+        </dl>
+
+        {object.physicalDescription && (
+          <>
+            <h2>Description</h2>
+            <p>{object.physicalDescription}</p>
+          </>
+        )}
+        {object.contentDescription && <p>{object.contentDescription}</p>}
+        {object.description && <p>{object.description}</p>}
+        {object.significanceStatement && (
+          <>
+            <h2>About the collection</h2>
+            <p>{object.significanceStatement}</p>
+          </>
+        )}
+
+        <p class="muted">
+          Read live from the Museum's Collection API ({retrieved}).
+          {object.modified && ` Record last updated by the Museum ${object.modified.slice(0, 10)}.`}
+          {object.licence && ` Licence: ${object.licence}.`}
+        </p>
+      </article>
+    )
+  }
+</Base>

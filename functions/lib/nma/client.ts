@@ -16,6 +16,13 @@ export interface NmaClientOptions {
   random?: () => number;
 }
 
+/** The `max-age` from a Cache-Control header, in seconds; 0 if absent or `no-store`/`no-cache`. */
+export function maxAgeSeconds(cacheControl: string | null): number {
+  if (!cacheControl || /no-store|no-cache/i.test(cacheControl)) return 0;
+  const match = /max-age=(\d+)/i.exec(cacheControl);
+  return match ? Number(match[1]) : 0;
+}
+
 export class NmaApiError extends Error {
   constructor(
     message: string,
@@ -77,13 +84,22 @@ export class NmaClient {
     }
   }
 
-  /** Fetches one object live. Returns null when the Museum has withdrawn it (410) or it doesn't exist. */
-  async getObject(id: string): Promise<NmaObject | null> {
+  /**
+   * Fetches one object live. `object` is null when the Museum has withdrawn it (410) or it doesn't
+   * exist. `maxAgeSeconds` is how long the Museum says the response may be cached (0 if it doesn't say).
+   */
+  async getObject(id: string): Promise<{ object: NmaObject | null; maxAgeSeconds: number }> {
     try {
-      const page = await this.getPage(`object/${encodeURIComponent(id)}`);
-      return page.data[0] ?? null;
+      const res = await this.request(`object/${encodeURIComponent(id)}`);
+      const page = (await res.json()) as NmaPage<NmaObject>;
+      return {
+        object: page.data[0] ?? null,
+        maxAgeSeconds: maxAgeSeconds(res.headers.get('cache-control')),
+      };
     } catch (err) {
-      if (err instanceof NmaApiError && (err.status === 404 || err.status === 410)) return null;
+      if (err instanceof NmaApiError && (err.status === 404 || err.status === 410)) {
+        return { object: null, maxAgeSeconds: 0 };
+      }
       throw err;
     }
   }

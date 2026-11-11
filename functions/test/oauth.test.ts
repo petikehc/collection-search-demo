@@ -5,6 +5,9 @@ import {
   createPkce,
   createState,
   exchangeCode,
+  logoutUrl,
+  refreshTokens,
+  revokeToken,
 } from '../lib/auth/oauth.js';
 
 describe('PKCE', () => {
@@ -88,7 +91,40 @@ describe('exchangeCode', () => {
       Response.json({ error: 'invalid_grant' }, { status: 400 }),
     );
     await expect(exchangeCode(params, fetchFn)).rejects.toThrow(
-      'Token exchange failed: HTTP 400 invalid_grant',
+      '/oauth2/token failed: HTTP 400 invalid_grant',
+    );
+  });
+});
+
+describe('refresh, revoke and logout', () => {
+  const client = { baseUrl: 'https://login.example.org', clientId: 'client', clientSecret: 's' };
+
+  it('refreshes with the refresh_token grant', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () => Response.json({ access_token: 'new' }));
+    expect(await refreshTokens({ ...client, refreshToken: 'r' }, fetchFn)).toEqual({
+      access_token: 'new',
+    });
+    const [url, init] = fetchFn.mock.calls[0] ?? [];
+    expect(String(url)).toBe('https://login.example.org/oauth2/token');
+    expect(Object.fromEntries(new URLSearchParams(String(init?.body)))).toEqual({
+      grant_type: 'refresh_token',
+      client_id: 'client',
+      refresh_token: 'r',
+    });
+  });
+
+  it('revokes the refresh token (an empty 200 response)', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () => new Response(null, { status: 200 }));
+    await revokeToken({ ...client, refreshToken: 'r' }, fetchFn);
+    const [url, init] = fetchFn.mock.calls[0] ?? [];
+    expect(String(url)).toBe('https://login.example.org/oauth2/revoke');
+    expect(new URLSearchParams(String(init?.body)).get('token')).toBe('r');
+  });
+
+  it("sends the user to Cognito's logout to end the managed login session too", () => {
+    const url = logoutUrl({ ...client, logoutUri: 'http://localhost:4321/' });
+    expect(url.toString()).toBe(
+      'https://login.example.org/logout?client_id=client&logout_uri=http%3A%2F%2Flocalhost%3A4321%2F',
     );
   });
 });
