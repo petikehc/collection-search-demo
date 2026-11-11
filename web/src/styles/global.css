@@ -1,0 +1,328 @@
+:root {
+  --ink: #1d1d1b;
+  --muted: #5c5a55;
+  --paper: #fbfaf7;
+  --line: #dedad2;
+  --accent: #8a3b12;
+  --accent-ink: #ffffff;
+  --mark: #fde68a;
+  --notice: #f3ede2;
+  --radius: 6px;
+  color-scheme: light;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+mark {
+  background: var(--mark);
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent);
+  color: var(--accent-ink);
+  padding: 0.35rem 0.9rem;
+}
+
+button.secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+input[type="search"],
+input[type="number"],
+textarea {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  background: #fff;
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--notice);
+  border-bottom: 1px solid var(--line);
+}
+
+.notice p {
+  margin: 0;
+  max-width: 60rem;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.site-header nav {
+  display: flex;
+  gap: 1rem;
+}
+
+.account {
+  margin-left: auto;
+}
+
+.account form {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+main {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.site-footer {
+  border-top: 1px solid var(--line);
+  padding: 1rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.site-footer p {
+  max-width: 60rem;
+  margin: 0.4rem auto;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.error {
+  border-left: 4px solid #b42318;
+  padding: 0.5rem 1rem;
+  background: #fef3f2;
+}
+
+/* Search */
+.search-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.search-form input[type="search"] {
+  flex: 1 1 16rem;
+}
+
+.search-layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 16rem) 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 48rem) {
+  .search-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.facets h2 {
+  font-size: 1rem;
+  margin: 1rem 0 0.25rem;
+}
+
+.facets ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.facets li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.filters a {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  text-decoration: none;
+}
+
+.results {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.result {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.result img {
+  width: 6rem;
+  height: 6rem;
+  object-fit: cover;
+  border-radius: var(--radius);
+  background: var(--line);
+}
+
+.no-image {
+  display: grid;
+  place-items: center;
+  width: 6rem;
+  height: 6rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.result h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1.05rem;
+}
+
+.result p {
+  margin: 0.25rem 0;
+}
+
+.pager {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 1rem;
+}
+
+/* Object */
+.object-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.object-images figure {
+  margin: 0;
+  max-width: 20rem;
+}
+
+.object-images img {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius);
+}
+
+.object-images figcaption {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+dl.facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+}
+
+dl.facts dt {
+  font-weight: 600;
+}
+
+dl.facts dd {
+  margin: 0;
+}
+
+/* Ask */
+.ask-form {
+  display: grid;
+  gap: 0.5rem;
+  max-width: 40rem;
+}
+
+.answer {
+  max-width: 48rem;
+  margin-top: 1.5rem;
+  white-space: pre-line;
+}
+
+.citations li {
+  margin: 0.25rem 0;
+}
+
+/* Favourites */
+.favourites {
+  list-style: none;
+  padding: 0;
+}
+
+.favourites li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.inline {
+  display: inline;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

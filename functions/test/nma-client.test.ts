@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NmaApiError, NmaClient } from '../lib/nma/client.js';
+import { maxAgeSeconds, NmaApiError, NmaClient } from '../lib/nma/client.js';
 import { evenlySpacedOffsets } from '../lib/nma/sample.js';
 
 type Reply = { status?: number; headers?: Record<string, string>; body?: unknown } | Error;
@@ -101,7 +101,14 @@ describe('NmaClient', () => {
 
   it('returns null for a withdrawn object (410)', async () => {
     const { client } = setup([{ status: 410 }]);
-    expect(await client.getObject('123')).toBeNull();
+    expect(await client.getObject('123')).toEqual({ object: null, maxAgeSeconds: 0 });
+  });
+
+  it("returns one object with the Museum's cache lifetime", async () => {
+    const { client } = setup([
+      { headers: { 'cache-control': 'max-age=43200' }, body: { data: [{ id: '123' }] } },
+    ]);
+    expect(await client.getObject('123')).toEqual({ object: { id: '123' }, maxAgeSeconds: 43200 });
   });
 
   it('reads the total from the result-count header when meta is missing', async () => {
@@ -122,5 +129,13 @@ describe('evenlySpacedOffsets', () => {
   it('handles empty and tiny result sets', () => {
     expect(evenlySpacedOffsets(0, 5, 100)).toEqual([]);
     expect(evenlySpacedOffsets(30, 5, 100)).toEqual([0]);
+  });
+});
+
+describe('maxAgeSeconds', () => {
+  it('reads max-age, and treats no-store or a missing header as "do not cache"', () => {
+    expect(maxAgeSeconds('public, max-age=43200')).toBe(43200);
+    expect(maxAgeSeconds('no-store, max-age=60')).toBe(0);
+    expect(maxAgeSeconds(null)).toBe(0);
   });
 });

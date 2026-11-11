@@ -1,0 +1,72 @@
+---
+import Base from '../layouts/Base.astro';
+import {
+  ApiError,
+  addFavourite,
+  type Favourite,
+  listFavourites,
+  removeFavourite,
+} from '../lib/api.js';
+import { safeReturnTo } from '../lib/session.js';
+
+const user = Astro.locals.user;
+if (!user) return Astro.redirect('/auth/login?returnTo=/favourites');
+
+// POST: add or remove, then redirect (so refreshing the page doesn't repeat it).
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const objectId = String(form.get('objectId') ?? '');
+  try {
+    if (form.get('action') === 'add') {
+      await addFavourite(user.accessToken, objectId, String(form.get('title') ?? ''));
+    } else if (form.get('action') === 'remove') {
+      await removeFavourite(user.accessToken, objectId);
+    }
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      return Astro.redirect('/auth/login?returnTo=/favourites');
+    }
+    console.error('favourites change failed', err);
+    return new Response('Could not update your favourites. Go back and try again.', {
+      status: 502,
+    });
+  }
+  return Astro.redirect(safeReturnTo(String(form.get('returnTo') ?? '/favourites')), 303);
+}
+
+let favourites: Favourite[] = [];
+let error: string | undefined;
+try {
+  favourites = await listFavourites(user.accessToken);
+} catch (err) {
+  console.error('favourites list failed', err);
+  error = 'Your favourites are unavailable right now. Please try again shortly.';
+}
+---
+
+<Base title="Favourites">
+  <h1>Your favourites</h1>
+  {error && <p class="error" role="alert">{error}</p>}
+  {!error && favourites.length === 0 && (
+    <p>No favourites yet. Open any object from <a href="/">search</a> and choose “Add to favourites”.</p>
+  )}
+  <ul class="favourites">
+    {
+      favourites.map((f) => (
+        <li>
+          <span>
+            <a href={`/object/${f.objectId}`}>{f.title}</a>{' '}
+            <span class="muted">
+              added {new Date(f.addedAt).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' })}
+            </span>
+          </span>
+          <form method="post" class="inline">
+            <input type="hidden" name="action" value="remove" />
+            <input type="hidden" name="objectId" value={f.objectId} />
+            <button type="submit" class="secondary" aria-label={`Remove ${f.title}`}>Remove</button>
+          </form>
+        </li>
+      ))
+    }
+  </ul>
+</Base>

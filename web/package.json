@@ -1,0 +1,22 @@
+{
+  "name": "web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "start": "node dist/server/entry.mjs",
+    "typecheck": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/node": "11.1.9",
+    "@aws-sdk/client-cloudformation": "3.1165.0",
+    "@aws-sdk/client-secrets-manager": "3.1165.0",
+    "astro": "7.4.4",
+    "aws-jwt-verify": "5.2.1"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.12",
+    "typescript": "6.0.3"
+  }
+}

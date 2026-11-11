@@ -61,39 +61,86 @@ export function authorizeUrl(p: AuthorizeParams): URL {
   return url;
 }
 
-export interface ExchangeParams {
+/** An app client's credentials. Public clients (the CLI) have no secret and rely on PKCE. */
+export interface ClientCredentials {
   baseUrl: string;
   clientId: string;
-  /** Confidential clients only (the web server); public clients rely on PKCE alone. */
   clientSecret?: string;
+}
+
+export interface ExchangeParams extends ClientCredentials {
   redirectUri: string;
   code: string;
   verifier: string;
 }
 
-export async function exchangeCode(p: ExchangeParams, fetchFn = fetch): Promise<Tokens> {
+export function exchangeCode(p: ExchangeParams, fetchFn = fetch): Promise<Tokens> {
+  return postForm<Tokens>(p, '/oauth2/token', fetchFn, {
+    grant_type: 'authorization_code',
+    client_id: p.clientId,
+    code: p.code,
+    redirect_uri: p.redirectUri,
+    code_verifier: p.verifier,
+  });
+}
+
+/** New access and ID tokens from a refresh token (Cognito doesn't return a new refresh token). */
+export function refreshTokens(
+  p: ClientCredentials & { refreshToken: string },
+  fetchFn = fetch,
+): Promise<Omit<Tokens, 'refresh_token'>> {
+  return postForm(p, '/oauth2/token', fetchFn, {
+    grant_type: 'refresh_token',
+    client_id: p.clientId,
+    refresh_token: p.refreshToken,
+  });
+}
+
+/**
+ * Revokes a refresh token, so it can't mint new access tokens. Access tokens already issued
+ * stay valid until they expire: API Gateway checks them locally and never asks Cognito.
+ */
+export async function revokeToken(
+  p: ClientCredentials & { refreshToken: string },
+  fetchFn = fetch,
+): Promise<void> {
+  await postForm(p, '/oauth2/revoke', fetchFn, {
+    client_id: p.clientId,
+    token: p.refreshToken,
+  });
+}
+
+/** Ends the user's session on Cognito's managed login too, then returns them to `logoutUri`. */
+export function logoutUrl(p: { baseUrl: string; clientId: string; logoutUri: string }): URL {
+  const url = new URL('/logout', p.baseUrl);
+  url.search = new URLSearchParams({ client_id: p.clientId, logout_uri: p.logoutUri }).toString();
+  return url;
+}
+
+async function postForm<T>(
+  client: ClientCredentials,
+  path: string,
+  fetchFn: typeof fetch,
+  form: Record<string, string>,
+): Promise<T> {
   const headers: Record<string, string> = {
     'content-type': 'application/x-www-form-urlencoded',
   };
-  if (p.clientSecret) {
-    const basic = Buffer.from(`${p.clientId}:${p.clientSecret}`).toString('base64');
+  if (client.clientSecret) {
+    const basic = Buffer.from(`${client.clientId}:${client.clientSecret}`).toString('base64');
     headers.authorization = `Basic ${basic}`;
   }
-  const res = await fetchFn(new URL('/oauth2/token', p.baseUrl), {
+  const res = await fetchFn(new URL(path, client.baseUrl), {
     method: 'POST',
     headers,
-    body: new URLSearchParams({
-      grant_type: 'authorization_code',
-      client_id: p.clientId,
-      code: p.code,
-      redirect_uri: p.redirectUri,
-      code_verifier: p.verifier,
-    }),
+    body: new URLSearchParams(form),
   });
   if (!res.ok) {
     // Cognito returns {"error": "invalid_grant"} and similar; never echo the request back.
     const { error } = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(`Token exchange failed: HTTP ${res.status} ${error ?? ''}`.trim());
+    throw new Error(`${path} failed: HTTP ${res.status} ${error ?? ''}`.trim());
   }
-  return (await res.json()) as Tokens;
+  // /oauth2/revoke returns an empty body.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
