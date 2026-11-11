@@ -20,7 +20,9 @@
     "generate:api": "openapi-typescript openapi.yaml -o functions/lib/api/types.gen.ts",
     "check:bundles": "pnpm synth && tsx scripts/check-bundles.ts",
     "status": "tsx scripts/status.ts",
-    "teardown": "tsx scripts/teardown.ts"
+    "teardown": "tsx scripts/teardown.ts",
+    "kb:sync": "tsx scripts/kb-sync.ts",
+    "kb:retrieve": "tsx scripts/kb-retrieve.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
@@ -30,6 +32,8 @@
   "devDependencies": {
     "@aws-sdk/client-api-gateway": "3.1165.0",
     "@aws-sdk/client-bedrock": "3.1165.0",
+    "@aws-sdk/client-bedrock-agent": "3.1166.0",
+    "@aws-sdk/client-bedrock-agent-runtime": "3.1166.0",
     "@aws-sdk/client-cloudformation": "3.1165.0",
     "@aws-sdk/client-cloudwatch-logs": "3.1165.0",
     "@aws-sdk/client-cost-explorer": "3.1165.0",

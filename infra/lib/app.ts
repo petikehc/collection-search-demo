@@ -1,4 +1,5 @@
 import { App, Aspects, type Environment } from 'aws-cdk-lib';
+import { AiStack } from './ai-stack.js';
 import { ApiStack } from './api-stack.js';
 import { LogGroupDefaults } from './log-group-defaults.js';
 import { SearchStack } from './search-stack.js';
@@ -18,6 +19,7 @@ export function buildApp(app = new App()): App {
   // Stack tags (explicitStackTags flag) are propagated by CloudFormation to every resource
   // that supports tags, so teardown and cost reports can find them.
   const search = new SearchStack(app, 'CollectionSearch-Search', { env, tags: PROJECT_TAGS });
+  new AiStack(app, 'CollectionSearch-Ai', { env, tags: PROJECT_TAGS, search });
   new ApiStack(app, 'CollectionSearch-Api', { env, tags: PROJECT_TAGS, search });
 
   Aspects.of(app).add(new LogGroupDefaults());

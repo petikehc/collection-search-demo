@@ -53,10 +53,19 @@ describe('SearchStack', () => {
     });
   });
 
-  it('only lets this account’s IAM principals through the access policy', () => {
-    const json = JSON.stringify(template.toJSON());
-    expect(json).not.toMatch(/"Principal":\s*\{\s*"AWS":\s*"\*"/);
-    expect(json).toContain('arn:aws:iam::111111111111:root');
+  it('only lets this account’s IAM principals through the domain access policy', () => {
+    // CDK applies the access policy with a custom resource after the domain exists; the policy
+    // is JSON inside its `Create` parameters (a Fn::Join of strings and refs).
+    const [resource] = Object.values(template.findResources('Custom::OpenSearchAccessPolicy'));
+    const parts: unknown[] = resource?.Properties.Create['Fn::Join'][1];
+    const create = JSON.parse(parts.map((p) => (typeof p === 'string' ? p : 'REF')).join(''));
+    const policy = JSON.parse(create.parameters.AccessPolicies);
+
+    const allows = policy.Statement.filter((st: { Effect: string }) => st.Effect === 'Allow');
+    expect(allows.length).toBeGreaterThan(0);
+    for (const st of allows) {
+      expect(st.Principal).toEqual({ AWS: 'arn:aws:iam::111111111111:root' });
+    }
   });
 
   it('is deleted, not retained, when the stack is destroyed', () => {

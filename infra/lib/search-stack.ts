@@ -9,9 +9,11 @@ import {
   IpAddressType,
   TLSSecurityPolicy,
 } from 'aws-cdk-lib/aws-opensearchservice';
+import { BlockPublicAccess, Bucket, BucketEncryption } from 'aws-cdk-lib/aws-s3';
 import { Schedule, ScheduleExpression } from 'aws-cdk-lib/aws-scheduler';
 import { LambdaInvoke } from 'aws-cdk-lib/aws-scheduler-targets';
 import type { Construct } from 'constructs';
+import { KB_PREFIX } from '../../functions/lib/kb/documents.js';
 import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
 import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
 import { FUNCTIONS_DIR, OpenSearchRole, OpenSearchRoleProvider } from './opensearch-role.js';
@@ -29,6 +31,8 @@ export class SearchStack extends Stack {
   readonly adminRole: Role;
   /** Reused by other stacks to map their IAM roles to OpenSearch roles. */
   readonly openSearchRoles: OpenSearchRoleProvider;
+  /** Knowledge Base source documents, written by the ingest under kb/. */
+  readonly docsBucket: Bucket;
 
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, { description: 'Collection search: OpenSearch domain and ingest', ...props });
@@ -106,7 +110,17 @@ export class SearchStack extends Stack {
       adminRole: this.adminRole,
     });
 
-    // Full ingest: Collection API → normalise → new versioned index → alias swap.
+    // Private, encrypted, TLS-only. SSE-S3 (not KMS) keeps ETags equal to the MD5 of the content,
+    // which the ingest uses to skip unchanged files. Emptied and deleted with the stack.
+    this.docsBucket = new Bucket(this, 'DocsBucket', {
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      encryption: BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
+    });
+
+    // Full ingest: Collection API → normalise → new versioned index → alias swap → KB documents.
     const ingest = new NodejsFunction(this, 'IngestFunction', {
       description: 'Fetches a Collection API sample and rebuilds the objects index',
       ...LAMBDA_DEFAULTS,
@@ -115,12 +129,20 @@ export class SearchStack extends Stack {
       timeout: Duration.minutes(10),
       // One ingest at a time, so two runs can't race on the alias swap.
       reservedConcurrentExecutions: 1,
-      environment: { ...LAMBDA_DEFAULTS.environment, DOMAIN_ENDPOINT: this.domain.domainEndpoint },
+      environment: {
+        ...LAMBDA_DEFAULTS.environment,
+        DOMAIN_ENDPOINT: this.domain.domainEndpoint,
+        DOCS_BUCKET: this.docsBucket.bucketName,
+      },
       logGroup: new LogGroup(this, 'IngestLogs', {
         retention: RetentionDays.TWO_WEEKS,
         removalPolicy: RemovalPolicy.DESTROY,
       }),
     });
+
+    // List, read, write and delete under kb/ only.
+    this.docsBucket.grantReadWrite(ingest, `${KB_PREFIX}*`);
+    this.docsBucket.grantDelete(ingest, `${KB_PREFIX}*`);
 
     // Write access to the objects indices and alias only: no other index, no security config.
     new OpenSearchRole(this, 'IngestWriterRole', {

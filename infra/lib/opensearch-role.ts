@@ -8,7 +8,7 @@ import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
 
 export const FUNCTIONS_DIR = new URL('../../functions/', import.meta.url).pathname;
 
-/** One provider per domain; every OpenSearchRole for that domain reuses it. */
+/** One provider per domain, shared by every OpenSearchRole and OpenSearchIndex on that domain. */
 export class OpenSearchRoleProvider extends Construct {
   readonly serviceToken: string;
 
@@ -88,6 +88,39 @@ export class OpenSearchRole extends Construct {
           index_patterns: p.indexPatterns,
           allowed_actions: p.allowedActions,
         })),
+      },
+    });
+  }
+}
+
+export interface OpenSearchIndexProps {
+  provider: OpenSearchRoleProvider;
+  domain: Domain;
+  adminRole: IRole;
+  indexName: string;
+  /** Settings and mappings, as sent to `PUT /<index>`. Fixed once created (use a new name). */
+  definition: object;
+}
+
+/**
+ * An index created and deleted with the stack, for indices another service writes into
+ * (e.g. the Bedrock Knowledge Base vector index, which must exist before the KB is created).
+ */
+export class OpenSearchIndex extends Construct {
+  readonly indexName: string;
+
+  constructor(scope: Construct, id: string, props: OpenSearchIndexProps) {
+    super(scope, id);
+    this.indexName = props.indexName;
+
+    new CustomResource(this, 'Resource', {
+      serviceToken: props.provider.serviceToken,
+      resourceType: 'Custom::OpenSearchIndex',
+      properties: {
+        Endpoint: props.domain.domainEndpoint,
+        AdminRoleArn: props.adminRole.roleArn,
+        IndexName: props.indexName,
+        Definition: JSON.stringify(props.definition),
       },
     });
   }

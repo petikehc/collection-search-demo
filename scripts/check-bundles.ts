@@ -19,8 +19,10 @@ const ENV = {
   DOMAIN_ENDPOINT: 'search-example.ap-southeast-2.es.amazonaws.com',
 };
 
+// Only our own bundles (built with source maps). CDK's built-in handlers, such as the one that
+// empties a bucket on delete, are designed to use the SDK in the Lambda runtime.
 const assets = readdirSync(CDK_OUT).filter(
-  (d) => d.startsWith('asset.') && existsSync(join(CDK_OUT, d, 'index.js')),
+  (d) => d.startsWith('asset.') && existsSync(join(CDK_OUT, d, 'index.js.map')),
 );
 if (assets.length === 0) throw new Error('No Lambda bundles found: run `pnpm synth` first');
 
