@@ -1,15 +1,29 @@
-import { CfnOutput, Stack, type StackProps } from 'aws-cdk-lib';
+import { CfnOutput, RemovalPolicy, Stack, type StackProps } from 'aws-cdk-lib';
 import { CfnDataSource, CfnKnowledgeBase } from 'aws-cdk-lib/aws-bedrock';
 import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import {
+  CustomDataIdentifier,
+  DataIdentifier,
+  DataProtectionPolicy,
+  LogGroup,
+  RetentionDays,
+} from 'aws-cdk-lib/aws-logs';
+import {
+  AwsCustomResource,
+  AwsCustomResourcePolicy,
+  PhysicalResourceId,
+} from 'aws-cdk-lib/custom-resources';
 import type { Construct } from 'constructs';
 import { KB_PREFIX } from '../../functions/lib/kb/documents.js';
-import { AskGuardrail } from './guardrail.js';
 import { OpenSearchIndex, OpenSearchRole } from './opensearch-role.js';
 import type { SearchStack } from './search-stack.js';
 
 export const KB_INDEX = 'kb-objects';
 export const EMBEDDING_MODEL_ID = 'amazon.titan-embed-text-v2:0';
 const EMBEDDING_DIMENSIONS = 1024;
+
+/** Australian phone numbers (CloudWatch has no managed identifier for them): 04xx xxx xxx, 02 xxxx xxxx, +61 … */
+export const AU_PHONE_REGEX = '(\\+61|0)[2-478]( ?[0-9]){8}';
 
 /** Field names in the KB vector index; Bedrock is told about them in the KB's field mapping. */
 const FIELDS = {
@@ -28,7 +42,6 @@ export interface AiStackProps extends StackProps {
  */
 export class AiStack extends Stack {
   readonly knowledgeBase: CfnKnowledgeBase;
-  readonly guardrail: AskGuardrail;
 
   constructor(scope: Construct, id: string, props: AiStackProps) {
     super(scope, id, { description: 'Collection search: Bedrock Knowledge Base', ...props });
@@ -163,11 +176,62 @@ export class AiStack extends Stack {
       },
     });
 
-    this.guardrail = new AskGuardrail(this, 'AskGuardrail');
+    // Model invocation logging: an account and region setting (not a stack resource), so a custom
+    // resource turns it on and, on delete, off. The logs hold full prompts and answers, and the
+    // guardrail's masking doesn't apply to them, so CloudWatch data protection masks contact details.
+    const invocationLogs = new LogGroup(this, 'ModelInvocationLogs', {
+      retention: RetentionDays.TWO_WEEKS,
+      removalPolicy: RemovalPolicy.DESTROY,
+      dataProtectionPolicy: new DataProtectionPolicy({
+        name: 'mask-contact-details',
+        identifiers: [
+          DataIdentifier.EMAILADDRESS,
+          new CustomDataIdentifier('AuPhoneNumber', AU_PHONE_REGEX),
+        ],
+      }),
+    });
+    const loggingRole = new Role(this, 'InvocationLoggingRole', {
+      description: 'Lets Bedrock write model invocation logs for this account',
+      assumedBy: new ServicePrincipal('bedrock.amazonaws.com', {
+        conditions: {
+          StringEquals: { 'aws:SourceAccount': this.account },
+          ArnLike: { 'aws:SourceArn': this.formatArn({ service: 'bedrock', resource: '*' }) },
+        },
+      }),
+    });
+    invocationLogs.grantWrite(loggingRole);
+
+    new AwsCustomResource(this, 'InvocationLogging', {
+      onUpdate: {
+        service: 'bedrock',
+        action: 'PutModelInvocationLoggingConfiguration',
+        parameters: {
+          loggingConfig: {
+            cloudWatchConfig: {
+              logGroupName: invocationLogs.logGroupName,
+              roleArn: loggingRole.roleArn,
+            },
+            textDataDeliveryEnabled: true,
+            imageDataDeliveryEnabled: false,
+            embeddingDataDeliveryEnabled: false,
+          },
+        },
+        physicalResourceId: PhysicalResourceId.of('bedrock-model-invocation-logging'),
+      },
+      onDelete: { service: 'bedrock', action: 'DeleteModelInvocationLoggingConfiguration' },
+      policy: AwsCustomResourcePolicy.fromStatements([
+        new PolicyStatement({
+          actions: [
+            'bedrock:PutModelInvocationLoggingConfiguration',
+            'bedrock:DeleteModelInvocationLoggingConfiguration',
+          ],
+          resources: ['*'],
+        }),
+        new PolicyStatement({ actions: ['iam:PassRole'], resources: [loggingRole.roleArn] }),
+      ]),
+    });
 
     new CfnOutput(this, 'KnowledgeBaseId', { value: this.knowledgeBase.attrKnowledgeBaseId });
-    new CfnOutput(this, 'GuardrailId', { value: this.guardrail.guardrailId });
-    new CfnOutput(this, 'GuardrailVersion', { value: this.guardrail.version });
     new CfnOutput(this, 'DataSourceId', { value: dataSource.attrDataSourceId });
   }
 }

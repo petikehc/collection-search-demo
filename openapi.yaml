@@ -26,6 +26,37 @@ paths:
               schema:
                 $ref: "#/components/schemas/Health"
 
+  /ask:
+    post:
+      operationId: askCollection
+      summary: Ask a question about the collection (RAG with citations)
+      description: |
+        Retrieves relevant collection records from the Bedrock Knowledge Base and has a model
+        answer from them only, with citations. A Bedrock Guardrail checks the question and the
+        answer. Not public: requests must be signed by an IAM principal in the account
+        (Cognito sign-in replaces this later).
+      security:
+        - sigv4: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AskRequest"
+      responses:
+        "200":
+          description: An answer, or the guardrail's message if the question or answer was blocked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AskResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          description: Request not signed by an allowed IAM principal
+        "429":
+          description: Throttled
+
   /search:
     get:
       operationId: searchObjects
@@ -74,6 +105,11 @@ paths:
 
 components:
   securitySchemes:
+    sigv4:
+      type: apiKey
+      in: header
+      name: Authorization
+      x-amazon-apigateway-authtype: awsSigv4
     apiKey:
       type: apiKey
       in: header
@@ -88,6 +124,34 @@ components:
             $ref: "#/components/schemas/Error"
 
   schemas:
+    AskRequest:
+      type: object
+      required: [question]
+      additionalProperties: false
+      properties:
+        question: { type: string, minLength: 3, maxLength: 500 }
+
+    AskResponse:
+      type: object
+      required: [answer, citations, guardrailAction, attribution]
+      properties:
+        answer: { type: string }
+        citations:
+          type: array
+          description: The collection objects the answer is based on, one per object
+          items:
+            type: object
+            required: [objectId, title, sourceUrl]
+            properties:
+              objectId: { type: string }
+              title: { type: string }
+              sourceUrl: { type: string, description: The record on the Museum's website }
+        guardrailAction:
+          type: string
+          enum: [NONE, INTERVENED]
+          description: INTERVENED when the guardrail blocked the question or the answer
+        attribution: { type: string }
+
     Health:
       type: object
       required: [status]

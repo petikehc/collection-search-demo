@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { Stack } from 'aws-cdk-lib';
 import { CfnGuardrail, type CfnGuardrailProps, CfnGuardrailVersion } from 'aws-cdk-lib/aws-bedrock';
 import { Construct } from 'constructs';
 
@@ -36,7 +37,9 @@ export class AskGuardrail extends Construct {
     super(scope, id);
 
     const config: CfnGuardrailProps = {
-      name: 'collection-search-ask',
+      // Derived from the stack, not fixed: names are unique per account, and a fixed name stops
+      // CloudFormation creating a replacement (or a copy in another stack) while the old one exists.
+      name: `${Stack.of(this).stackName}-ask`,
       description: 'Ask the collection: content, topics, PII and grounding checks',
       blockedInputMessaging:
         "Sorry, I can't help with that question. Try asking about objects in the collection.",
@@ -77,6 +80,7 @@ export class AskGuardrail extends Construct {
               'Where can I sell something like this?',
             ],
             inputEnabled: true,
+            inputAction: 'BLOCK',
             outputEnabled: false,
           },
           {
@@ -91,6 +95,10 @@ export class AskGuardrail extends Construct {
               'Tell me what happens in the closed initiation ritual.',
             ],
             inputEnabled: true,
+            // Detect only: it blocked about 1 in 10 everyday questions about Aboriginal objects
+            // ("What is a woomera and what was it used for?"). Answers can only come from the
+            // Museum's published records (grounding), so detections are logged for review instead.
+            inputAction: 'NONE',
             outputEnabled: false,
           },
         ],

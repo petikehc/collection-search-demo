@@ -21,6 +21,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ask": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask a question about the collection (RAG with citations)
+         * @description Retrieves relevant collection records from the Bedrock Knowledge Base and has a model
+         *     answer from them only, with citations. A Bedrock Guardrail checks the question and the
+         *     answer. Not public: requests must be signed by an IAM principal in the account
+         *     (Cognito sign-in replaces this later).
+         */
+        post: operations["askCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/search": {
         parameters: {
             query?: never;
@@ -42,6 +65,25 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AskRequest: {
+            question: string;
+        };
+        AskResponse: {
+            answer: string;
+            /** @description The collection objects the answer is based on, one per object */
+            citations: {
+                objectId: string;
+                title: string;
+                /** @description The record on the Museum's website */
+                sourceUrl: string;
+            }[];
+            /**
+             * @description INTERVENED when the guardrail blocked the question or the answer
+             * @enum {string}
+             */
+            guardrailAction: "NONE" | "INTERVENED";
+            attribution: string;
+        };
         Health: {
             /** @enum {string} */
             status: "ok";
@@ -132,6 +174,45 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Health"];
                 };
+            };
+        };
+    };
+    askCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AskRequest"];
+            };
+        };
+        responses: {
+            /** @description An answer, or the guardrail's message if the question or answer was blocked */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AskResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description Request not signed by an allowed IAM principal */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Throttled */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -8,7 +8,7 @@ import {
   Period,
   SpecRestApi,
 } from 'aws-cdk-lib/aws-apigateway';
-import { type IRole, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
+import { type IRole, PolicyStatement, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 import { Tracing } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { LogGroup } from 'aws-cdk-lib/aws-logs';
@@ -16,25 +16,38 @@ import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
 import type { Construct } from 'constructs';
 import { parse } from 'yaml';
 import { OBJECTS_ALIAS } from '../../functions/lib/search/constants.js';
+import type { AiStack } from './ai-stack.js';
+import { AskGuardrail } from './guardrail.js';
 import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
 import { FUNCTIONS_DIR, OpenSearchRole } from './opensearch-role.js';
 import type { SearchStack } from './search-stack.js';
 
 export const STAGE = 'v1';
+
+/** Haiku 4.5 through the Australian cross-region inference profile: Sydney and Melbourne only. */
+export const ASK_PROFILE_ID = 'au.anthropic.claude-haiku-4-5-20251001-v1:0';
+const ASK_FOUNDATION_MODEL = 'anthropic.claude-haiku-4-5-20251001-v1:0';
+const ASK_PROFILE_REGIONS = ['ap-southeast-2', 'ap-southeast-4'];
 const OPENAPI_FILE = new URL('../../openapi.yaml', import.meta.url);
 
 export interface ApiStackProps extends StackProps {
   search: SearchStack;
+  ai: AiStack;
 }
 
 /**
- * API Gateway REST API built from openapi.yaml (the contract), with the search Lambda behind it.
+ * API Gateway REST API built from openapi.yaml (the contract), with the search and ask Lambdas.
  * REST (not HTTP) API because usage plans, API keys and request validation are REST-only.
  */
 export class ApiStack extends Stack {
   constructor(scope: Construct, id: string, props: ApiStackProps) {
     super(scope, id, { description: 'Collection search: API Gateway and Lambdas', ...props });
     const { domain, adminRole, openSearchRoles } = props.search;
+    const { knowledgeBase } = props.ai;
+
+    // Owned here, next to its only user: each guardrail change publishes a new version, and a
+    // value exported from another stack can't change while this stack imports it.
+    const guardrail = new AskGuardrail(this, 'AskGuardrail');
 
     const searchFn = new NodejsFunction(this, 'SearchFunction', {
       description: 'GET /search: queries the objects alias in OpenSearch',
@@ -68,9 +81,67 @@ export class ApiStack extends Stack {
       },
     });
 
+    // POST /ask: RetrieveAndGenerate with the guardrail. Every call costs money, so reserved
+    // concurrency is a hard ceiling on parallel model calls (API Gateway throttles are best effort).
+    const askProfileArn = this.formatArn({
+      service: 'bedrock',
+      resource: 'inference-profile',
+      resourceName: ASK_PROFILE_ID,
+    });
+    const askFn = new NodejsFunction(this, 'AskFunction', {
+      description: 'POST /ask: RAG over the collection with the guardrail applied',
+      ...LAMBDA_DEFAULTS,
+      entry: `${FUNCTIONS_DIR}ask/handler.ts`,
+      memorySize: 512,
+      timeout: Duration.seconds(28), // just under API Gateway's 29-second integration limit
+      reservedConcurrentExecutions: 2,
+      tracing: Tracing.ACTIVE,
+      logGroup: new LogGroup(this, 'AskLogs'),
+      environment: {
+        ...LAMBDA_DEFAULTS.environment,
+        KNOWLEDGE_BASE_ID: knowledgeBase.attrKnowledgeBaseId,
+        MODEL_ARN: askProfileArn,
+        GUARDRAIL_ID: guardrail.guardrailId,
+        GUARDRAIL_VERSION: guardrail.version,
+        POWERTOOLS_SERVICE_NAME: 'ask',
+        POWERTOOLS_METRICS_NAMESPACE: 'CollectionSearch',
+      },
+    });
+    // RetrieveAndGenerate has no resource type; the calls it makes are each scoped below.
+    askFn.addToRolePolicy(
+      new PolicyStatement({ actions: ['bedrock:RetrieveAndGenerate'], resources: ['*'] }),
+    );
+    askFn.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['bedrock:Retrieve'],
+        resources: [knowledgeBase.attrKnowledgeBaseArn],
+      }),
+    );
+    // An inference profile needs permission on the profile and on the model in each of its regions.
+    askFn.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['bedrock:InvokeModel', 'bedrock:GetInferenceProfile'],
+        resources: [
+          askProfileArn,
+          ...ASK_PROFILE_REGIONS.map(
+            (region) =>
+              `arn:${Aws.PARTITION}:bedrock:${region}::foundation-model/${ASK_FOUNDATION_MODEL}`,
+          ),
+        ],
+      }),
+    );
+    askFn.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['bedrock:ApplyGuardrail'],
+        resources: [guardrail.guardrailArn],
+      }),
+    );
+
     const api = new SpecRestApi(this, 'Api', {
       restApiName: 'collection-search',
-      apiDefinition: ApiDefinition.fromInline(withIntegrations(searchFn.functionArn)),
+      apiDefinition: ApiDefinition.fromInline(
+        withIntegrations({ search: searchFn.functionArn, ask: askFn.functionArn }),
+      ),
       endpointTypes: [EndpointType.REGIONAL],
       // Account-level role that lets API Gateway write logs to CloudWatch (none was set).
       cloudWatchRole: true,
@@ -83,12 +154,18 @@ export class ApiStack extends Stack {
         tracingEnabled: true,
         accessLogDestination: new LogGroupLogDestination(new LogGroup(this, 'AccessLogs')),
         accessLogFormat: AccessLogFormat.jsonWithStandardFields(),
+        // /ask calls a model on every request: a much lower limit than the stage default.
+        methodOptions: { '/ask/POST': { throttlingRateLimit: 1, throttlingBurstLimit: 2 } },
       },
     });
 
     searchFn.addPermission('InvokeFromApi', {
       principal: new ServicePrincipal('apigateway.amazonaws.com'),
       sourceArn: api.arnForExecuteApi('GET', '/search', STAGE),
+    });
+    askFn.addPermission('InvokeFromApi', {
+      principal: new ServicePrincipal('apigateway.amazonaws.com'),
+      sourceArn: api.arnForExecuteApi('POST', '/ask', STAGE),
     });
 
     // The key the Astro server sends. Generated into Secrets Manager; the template only holds
@@ -110,6 +187,9 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'ApiUrl', { value: api.url });
     new CfnOutput(this, 'ApiKeySecretArn', { value: keySecret.secretArn });
     new CfnOutput(this, 'SearchFunctionName', { value: searchFn.functionName });
+    new CfnOutput(this, 'AskModelArn', { value: askProfileArn });
+    new CfnOutput(this, 'GuardrailId', { value: guardrail.guardrailId });
+    new CfnOutput(this, 'GuardrailVersion', { value: guardrail.version });
   }
 }
 
@@ -117,21 +197,27 @@ export class ApiStack extends Stack {
  * openapi.yaml stays a plain contract; the AWS-specific integration details are added here,
  * where the Lambda ARN is known.
  */
-function withIntegrations(searchFunctionArn: string) {
+function withIntegrations(functionArns: { search: string; ask: string }) {
   const spec = parse(readFileSync(OPENAPI_FILE, 'utf8'));
+  const lambdaProxy = (functionArn: string) => ({
+    type: 'aws_proxy',
+    httpMethod: 'POST',
+    uri: `arn:${Aws.PARTITION}:apigateway:${Aws.REGION}:lambda:path/2015-03-31/functions/${functionArn}/invocations`,
+  });
 
   // API Gateway can check required parameters before invoking the Lambda (types and ranges are
   // still validated in the Lambda; the REST validator doesn't check those).
   spec['x-amazon-apigateway-request-validators'] = {
     params: { validateRequestParameters: true, validateRequestBody: false },
+    body: { validateRequestParameters: false, validateRequestBody: true },
   };
 
   spec.paths['/search'].get['x-amazon-apigateway-request-validator'] = 'params';
-  spec.paths['/search'].get['x-amazon-apigateway-integration'] = {
-    type: 'aws_proxy',
-    httpMethod: 'POST',
-    uri: `arn:${Aws.PARTITION}:apigateway:${Aws.REGION}:lambda:path/2015-03-31/functions/${searchFunctionArn}/invocations`,
-  };
+  spec.paths['/search'].get['x-amazon-apigateway-integration'] = lambdaProxy(functionArns.search);
+
+  // Request bodies are checked against the AskRequest schema before the Lambda (and a model) runs.
+  spec.paths['/ask'].post['x-amazon-apigateway-request-validator'] = 'body';
+  spec.paths['/ask'].post['x-amazon-apigateway-integration'] = lambdaProxy(functionArns.ask);
 
   // Answered by API Gateway itself: no Lambda, no cost beyond the request.
   spec.paths['/health'].get['x-amazon-apigateway-integration'] = {
