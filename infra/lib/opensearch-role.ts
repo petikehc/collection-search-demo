@@ -125,3 +125,32 @@ export class OpenSearchIndex extends Construct {
     });
   }
 }
+
+export interface OpenSearchSearchPipelineProps {
+  provider: OpenSearchRoleProvider;
+  domain: Domain;
+  adminRole: IRole;
+  pipelineName: string;
+  /** The pipeline body, as sent to `PUT /_search/pipeline/<name>`. */
+  definition: object;
+}
+
+/**
+ * A search pipeline (steps OpenSearch runs on a search's results), created, updated and deleted
+ * with the stack. Hybrid search needs one to normalise and combine keyword and vector scores.
+ */
+export class OpenSearchSearchPipeline extends Construct {
+  constructor(scope: Construct, id: string, props: OpenSearchSearchPipelineProps) {
+    super(scope, id);
+    new CustomResource(this, 'Resource', {
+      serviceToken: props.provider.serviceToken,
+      resourceType: 'Custom::OpenSearchSearchPipeline',
+      properties: {
+        Endpoint: props.domain.domainEndpoint,
+        AdminRoleArn: props.adminRole.roleArn,
+        PipelineName: props.pipelineName,
+        Definition: JSON.stringify(props.definition),
+      },
+    });
+  }
+}

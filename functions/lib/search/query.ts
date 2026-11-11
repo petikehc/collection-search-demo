@@ -1,4 +1,5 @@
 import type { components } from '../api/types.gen.js';
+import { HYBRID_DEPTH, HYBRID_NEIGHBOURS } from './constants.js';
 
 type SearchResponse = components['schemas']['SearchResponse'];
 type SearchResult = components['schemas']['SearchResult'];
@@ -44,6 +45,9 @@ export interface SearchParams {
   place?: string;
   yearFrom?: number;
   yearTo?: number;
+  hasImage?: boolean;
+  /** `hybrid` blends keyword and vector matches when there's a query; `keyword` never does. */
+  mode: 'hybrid' | 'keyword';
   page: number;
   size: number;
 }
@@ -71,12 +75,29 @@ export function parseSearchParams(raw: Record<string, string | undefined> | null
       : new Error(`${name} must be an integer from ${min} to ${max}`);
   };
 
+  const choice = <T extends string>(name: string, options: readonly T[], fallback: T) => {
+    const value = query[name];
+    if (value === undefined || value === '') return fallback;
+    return (options as readonly string[]).includes(value)
+      ? (value as T)
+      : new Error(`${name} must be one of: ${options.join(', ')}`);
+  };
+  const flag = (name: string) => {
+    const value = query[name];
+    if (value === undefined || value === '') return undefined;
+    return value === 'true' || value === 'false'
+      ? value === 'true'
+      : new Error(`${name} must be true or false`);
+  };
+
   const params = {
     q: text('q'),
     type: text('type'),
     place: text('place'),
     yearFrom: int('yearFrom', 0, 2100),
     yearTo: int('yearTo', 0, 2100),
+    hasImage: flag('hasImage'),
+    mode: choice('mode', ['hybrid', 'keyword'] as const, 'hybrid'),
     page: int('page', 1, 100, 1),
     size: int('size', 1, 50, 20),
   };
@@ -87,11 +108,29 @@ export function parseSearchParams(raw: Record<string, string | undefined> | null
   if (valid.yearFrom !== undefined && valid.yearTo !== undefined && valid.yearFrom > valid.yearTo) {
     return { ok: false, message: 'yearFrom must not be after yearTo' };
   }
+  if (isHybrid(valid) && valid.page * valid.size > HYBRID_DEPTH) {
+    return {
+      ok: false,
+      message: `Only the best ${HYBRID_DEPTH} matches can be paged through; narrow the search, or use mode=keyword`,
+    };
+  }
   return { ok: true, params: valid };
 }
 
-/** Builds the OpenSearch request body: relevance query, exact filters, facets and highlights. */
-export function buildSearchBody(params: SearchParams) {
+/** Hybrid needs words to embed: browsing (no `q`) and `mode=keyword` are keyword-only. */
+export function isHybrid(params: Pick<SearchParams, 'q' | 'mode'>): boolean {
+  return params.mode === 'hybrid' && Boolean(params.q);
+}
+
+/**
+ * Builds the OpenSearch request body: relevance query, exact filters, facets and highlights.
+ *
+ * With `queryVector` (the embedded query), the relevance query is a hybrid of the keyword query
+ * and the nearest neighbours by meaning. The index's search pipeline normalises and combines
+ * the two scores, so "woomera" still ranks exact matches first, while a question or a typo
+ * that matches no words still finds related objects.
+ */
+export function buildSearchBody(params: SearchParams, queryVector?: number[]) {
   const filter: object[] = [];
   if (params.type) filter.push({ term: { 'types.keyword': params.type } });
   if (params.place) filter.push({ term: { 'places.keyword': params.place } });
@@ -102,6 +141,7 @@ export function buildSearchBody(params: SearchParams) {
       filter.push({ range: { yearEnd: { gte: params.yearFrom } } });
     }
   }
+  if (params.hasImage !== undefined) filter.push({ term: { hasImage: params.hasImage } });
 
   const must = params.q
     ? [
@@ -125,7 +165,28 @@ export function buildSearchBody(params: SearchParams) {
     size: params.size,
     track_total_hits: 10_000,
     _source: RESULT_FIELDS,
-    query: { bool: { must, filter } },
+    query: queryVector
+      ? {
+          hybrid: {
+            // Constant across pages, so page 2 continues the same ranking as page 1.
+            pagination_depth: HYBRID_DEPTH,
+            queries: [
+              { bool: { must, filter } },
+              // The same filters inside the k-NN search, so it returns the nearest *matching*
+              // neighbours rather than filtering afterwards and coming back short.
+              {
+                knn: {
+                  embedding: {
+                    vector: queryVector,
+                    k: HYBRID_NEIGHBOURS,
+                    filter: { bool: { filter } },
+                  },
+                },
+              },
+            ],
+          },
+        }
+      : { bool: { must, filter } },
     highlight: {
       // Escape the document text, so only our <mark> tags are HTML (the snippet is rendered as HTML).
       encoder: 'html',
@@ -134,6 +195,9 @@ export function buildSearchBody(params: SearchParams) {
       fields: { physicalDescription: { fragment_size: 160, number_of_fragments: 1 } },
     },
     aggs: {
+      // In a hybrid search the total includes neighbours that share no words with the query:
+      // this counts the ones that do.
+      ...(queryVector && { keywordMatches: { filter: { bool: { must } } } }),
       types: { terms: { field: 'types.keyword', size: 15 } },
       places: { terms: { field: 'places.keyword', size: 15 } },
       dated: { filter: { exists: { field: 'yearStart' } } },
@@ -175,6 +239,7 @@ export interface OpenSearchSearchBody {
     types?: { buckets: Bucket<string>[] };
     places?: { buckets: Bucket<string>[] };
     dated?: { doc_count: number };
+    keywordMatches?: { doc_count: number };
     decades?: { buckets: Bucket<number>[] };
   };
 }
@@ -188,6 +253,8 @@ export function toSearchResponse(body: OpenSearchSearchBody, params: SearchParam
 
   return {
     total,
+    keywordTotal: aggs.keywordMatches?.doc_count ?? total,
+    mode: aggs.keywordMatches ? 'hybrid' : 'keyword',
     page: params.page,
     size: params.size,
     results: body.hits.hits.map(toResult),

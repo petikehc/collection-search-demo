@@ -100,6 +100,30 @@ describe('SearchStack ingest', () => {
     });
   });
 
+  it('may embed objects with Titan V2 in this region, and no other model', () => {
+    const policies = JSON.stringify(template.findResources('AWS::IAM::Policy'));
+    expect(policies).toContain('bedrock:InvokeModel');
+    expect(policies).toContain(
+      ':bedrock:ap-southeast-2::foundation-model/amazon.titan-embed-text-v2:0',
+    );
+    expect(policies).not.toMatch(/foundation-model\/\*/);
+  });
+
+  it('creates the hybrid search pipeline: L2 normalisation, weighted towards keywords', () => {
+    const [pipeline] = Object.values(template.findResources('Custom::OpenSearchSearchPipeline'));
+    expect(pipeline?.Properties.PipelineName).toBe('objects-hybrid');
+    expect(JSON.parse(pipeline?.Properties.Definition)).toMatchObject({
+      phase_results_processors: [
+        {
+          'normalization-processor': {
+            normalization: { technique: 'l2' },
+            combination: { technique: 'arithmetic_mean', parameters: { weights: [0.6, 0.4] } },
+          },
+        },
+      ],
+    });
+  });
+
   it('lets the role custom resource assume only the admin role', () => {
     template.hasResourceProperties('AWS::IAM::Policy', {
       PolicyDocument: {

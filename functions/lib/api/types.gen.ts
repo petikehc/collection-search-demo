@@ -143,6 +143,13 @@ export interface components {
         SearchResponse: {
             /** @description Total matching objects (exact up to 10,000) */
             total: number;
+            /** @description How many of `total` match the query's words. In a hybrid search the rest are related by meaning only; in a keyword search it equals `total`. */
+            keywordTotal: number;
+            /**
+             * @description How this search ran. A hybrid request falls back to `keyword` when there is no `q`, or if the query couldn't be embedded.
+             * @enum {string}
+             */
+            mode: "hybrid" | "keyword";
             page: number;
             size: number;
             results: components["schemas"]["SearchResult"][];
@@ -365,6 +372,10 @@ export interface operations {
                 /** @description Only dated objects whose date range overlaps [yearFrom, yearTo]. */
                 yearFrom?: number;
                 yearTo?: number;
+                /** @description Only objects with (true) or without (false) an image in the Museum's data. */
+                hasImage?: boolean;
+                /** @description `hybrid` (default) ranks keyword matches together with the objects nearest in meaning, so questions and misspellings still find related objects. It applies when `q` is set, and only the best 200 matches can be paged through. `keyword` matches words only. */
+                mode?: "hybrid" | "keyword";
                 page?: number;
                 size?: number;
             };

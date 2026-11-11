@@ -84,7 +84,7 @@ describe('objects index definition', () => {
       modified: '',
       licence: '',
     };
-    expect(Object.keys(toSearchDocument(full)).sort()).toEqual(mapped);
+    expect(Object.keys(toSearchDocument(full, [0])).sort()).toEqual(mapped);
   });
 
   it('applies synonyms at search time only', () => {
