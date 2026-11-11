@@ -4,6 +4,7 @@ import { Match, Template } from 'aws-cdk-lib/assertions';
 import { describe, expect, it } from 'vitest';
 import { AiStack } from '../lib/ai-stack.js';
 import { ApiStack } from '../lib/api-stack.js';
+import { AuthStack } from '../lib/auth-stack.js';
 import { SearchStack } from '../lib/search-stack.js';
 
 const { context } = JSON.parse(readFileSync(new URL('../cdk.json', import.meta.url), 'utf8'));
@@ -14,7 +15,14 @@ const build = () => {
   const search = new SearchStack(app, 'Search', { env });
   const ai = new AiStack(app, 'Ai', { env, search });
   return {
-    api: Template.fromStack(new ApiStack(app, 'Api', { env, search, ai })),
+    api: Template.fromStack(
+      new ApiStack(app, 'Api', {
+        env,
+        search,
+        ai,
+        userPool: new AuthStack(app, 'Auth', { env }).userPool,
+      }),
+    ),
     ai: Template.fromStack(ai),
   };
 };
@@ -31,7 +39,7 @@ describe('Monitoring', () => {
 
   it('alarms on errors, slow or unusual Ask use, and OpenSearch health, all to the topic', () => {
     const alarms = Object.values(api.findResources('AWS::CloudWatch::Alarm'));
-    expect(alarms).toHaveLength(10);
+    expect(alarms).toHaveLength(11);
     for (const a of alarms) expect(a.Properties.AlarmActions).toHaveLength(1);
   });
 

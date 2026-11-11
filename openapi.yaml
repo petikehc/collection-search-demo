@@ -33,10 +33,10 @@ paths:
       description: |
         Retrieves relevant collection records from the Bedrock Knowledge Base and has a model
         answer from them only, with citations. A Bedrock Guardrail checks the question and the
-        answer. Not public: requests must be signed by an IAM principal in the account
-        (Cognito sign-in replaces this later).
+        answer. Needs a signed-in user's access token with the `ask` scope, and the API key.
       security:
-        - sigv4: []
+        - cognito: [collection-search/ask]
+          apiKey: []
       requestBody:
         required: true
         content:
@@ -52,10 +52,75 @@ paths:
                 $ref: "#/components/schemas/AskResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Request not signed by an allowed IAM principal
+          $ref: "#/components/responses/Forbidden"
         "429":
           description: Throttled
+
+  /favourites:
+    get:
+      operationId: listFavourites
+      summary: The signed-in user's favourite objects, newest first
+      security:
+        - cognito: [collection-search/favourites]
+          apiKey: []
+      responses:
+        "200":
+          description: The user's favourites
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FavouritesResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /favourites/{objectId}:
+    parameters:
+      - $ref: "#/components/parameters/ObjectId"
+    put:
+      operationId: addFavourite
+      summary: Add an object to the signed-in user's favourites (repeating it is harmless)
+      security:
+        - cognito: [collection-search/favourites]
+          apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FavouriteRequest"
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Favourite"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    delete:
+      operationId: removeFavourite
+      summary: Remove an object from the signed-in user's favourites (removing a missing one is harmless)
+      security:
+        - cognito: [collection-search/favourites]
+          apiKey: []
+      responses:
+        "204":
+          description: Removed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
 
   /search:
     get:
@@ -105,17 +170,33 @@ paths:
 
 components:
   securitySchemes:
-    sigv4:
+    # A Cognito access token ("Authorization: <token>"). API Gateway's form: an apiKey-type
+    # scheme with scopes in the requirement. The user pool is added in infra/lib/api-stack.ts.
+    cognito:
       type: apiKey
       in: header
       name: Authorization
-      x-amazon-apigateway-authtype: awsSigv4
+      x-amazon-apigateway-authtype: cognito_user_pools
     apiKey:
       type: apiKey
       in: header
       name: x-api-key
 
+  parameters:
+    ObjectId:
+      name: objectId
+      in: path
+      required: true
+      description: The Museum's object ID (digits only)
+      schema: { type: string, pattern: "^[0-9]{1,12}$" }
+
   responses:
+    Unauthorized:
+      description: >-
+        Missing, expired or invalid access token, or a valid one without the operation's scope
+        (API Gateway checks the token before the API key, so this also wins when both are missing)
+    Forbidden:
+      description: Valid token, but a missing or invalid API key
     BadRequest:
       description: Invalid parameters
       content:
@@ -151,6 +232,30 @@ components:
           enum: [NONE, INTERVENED]
           description: INTERVENED when the guardrail blocked the question or the answer
         attribution: { type: string }
+
+    FavouriteRequest:
+      type: object
+      required: [title]
+      additionalProperties: false
+      properties:
+        title: { type: string, minLength: 1, maxLength: 300 }
+
+    Favourite:
+      type: object
+      required: [objectId, title, addedAt]
+      properties:
+        objectId: { type: string }
+        title: { type: string }
+        addedAt: { type: string, format: date-time }
+
+    FavouritesResponse:
+      type: object
+      required: [favourites]
+      properties:
+        favourites:
+          type: array
+          items:
+            $ref: "#/components/schemas/Favourite"
 
     Health:
       type: object
