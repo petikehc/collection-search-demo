@@ -2,6 +2,7 @@ import { App, Aspects, type Environment } from 'aws-cdk-lib';
 import { AiStack } from './ai-stack.js';
 import { ApiStack } from './api-stack.js';
 import { AuthStack } from './auth-stack.js';
+import { CiStack } from './ci-stack.js';
 import { LogGroupDefaults } from './log-group-defaults.js';
 import { SearchStack } from './search-stack.js';
 
@@ -29,6 +30,13 @@ export function buildApp(app = new App()): App {
     ai,
     userPool: auth.userPool,
   });
+
+  // The deploy role for GitHub Actions. The repository comes from `-c githubRepo=owner/name`, or
+  // from GITHUB_REPOSITORY inside GitHub Actions, so no account or user name is in the code.
+  const githubRepo = app.node.tryGetContext('githubRepo') ?? process.env.GITHUB_REPOSITORY;
+  if (githubRepo) {
+    new CiStack(app, 'CollectionSearch-Ci', { env, tags: PROJECT_TAGS, githubRepo });
+  }
 
   Aspects.of(app).add(new LogGroupDefaults());
 

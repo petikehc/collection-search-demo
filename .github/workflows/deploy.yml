@@ -1,0 +1,44 @@
+# Deploys the app stacks from main, started by hand (Actions → Deploy → Run workflow).
+# No AWS keys are stored in GitHub: the job exchanges GitHub's OIDC token for short-lived
+# credentials for the role in the Ci stack, whose ARN is the repository variable
+# AWS_DEPLOY_ROLE_ARN (Settings → Secrets and variables → Actions → Variables).
+name: Deploy
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # lets the job request a GitHub OIDC token
+
+# Never two deploys at once; a second run waits rather than cancelling the first.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0 (version from package.json)
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-southeast-2
+
+      # The Api stack and everything it depends on (Search, Ai, Auth). The Ci stack is deployed
+      # by hand: the deploy role shouldn't redeploy its own permissions.
+      - run: pnpm cdk:deploy CollectionSearch-Api --require-approval never
