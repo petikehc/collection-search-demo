@@ -4,6 +4,8 @@ A learning project: hands-on with Amazon Bedrock, Amazon OpenSearch Service and 
 
 It indexes a sample of the National Museum of Australia's public collection (about 3,750 objects) for keyword search with facets. It also offers **Ask the collection**: questions answered from the collection records with retrieval-augmented generation, through a Bedrock Knowledge Base and a Guardrail, with a citation for every claim.
 
+**Live:** https://collection-search.idoescode.com, while the stacks are deployed. They're torn down between demos to save cost, and rebuilt from code.
+
 > **Screen recording:** _to be added._
 
 ## What it does
@@ -17,7 +19,8 @@ It indexes a sample of the National Museum of Australia's public collection (abo
 
 ```mermaid
 flowchart LR
-  user([Browser]) --> web["Astro server<br/>(runs locally)"]
+  user([Browser]) -- "https://collection-search.idoescode.com" --> site[API Gateway HTTP API<br/>custom domain]
+  site --> web["Astro server<br/>in Lambda"]
   web -- "sign-in: code grant + PKCE" --> cognito[Cognito managed login]
   web -- "live object pages" --> nma[(Museum Collection API)]
   web -- "API key + access token" --> apigw[API Gateway REST<br/>from openapi.yaml]
@@ -46,6 +49,8 @@ Everything runs in `ap-southeast-2` (Sydney). Generation uses the `au.` cross-re
 | `CollectionSearch-Ai`     | Knowledge Base and data source, Guardrail, Bedrock invocation logging                                        |
 | `CollectionSearch-Auth`   | Cognito user pool, managed login, resource server with `ask` and `favourites` scopes, web and CLI clients    |
 | `CollectionSearch-Api`    | API Gateway (usage plan, API key, throttling, Cognito authoriser), Lambdas, DynamoDB, alarms, dashboard      |
+| `CollectionSearch-Web`    | The Astro server in Lambda (Lambda Web Adapter), behind an HTTP API on the custom domain                     |
+| `CollectionSearch-Domain` | The site's certificate and custom domain name (kept by teardown, so the DNS records stay valid)              |
 | `CollectionSearch-Ci`     | GitHub OIDC provider and the deploy role (deployed by hand, kept by teardown)                                |
 
 ## What's real and what isn't
@@ -54,9 +59,8 @@ Everything runs in `ap-southeast-2` (Sydney). Generation uses the `au.` cross-re
 
 **Not production-ready, on purpose:**
 
-- The web front end runs on `localhost` only, so the Cognito callback URLs are `http://localhost`.
 - There's one OpenSearch node with no replicas, and everything is deleted on teardown (`RemovalPolicy.DESTROY`).
-- There's no MFA and no custom domain.
+- There's no MFA.
 - The data is a sample of about 3,750 of the Museum's 97,000 objects.
 
 ## Running it
@@ -76,12 +80,19 @@ pnpm install
 # Where alarm emails go. Kept outside the code. Confirm the subscription email AWS sends you.
 aws ssm put-parameter --name /collection-search/alarm-email --type String --value you@example.org
 
-pnpm cdk:deploy --all     # Search, Ai, Auth, Api (the Ci stack needs the step below)
+pnpm cdk:deploy --all     # every stack except Ci (see below); the Astro build runs during synth
 pnpm ingest               # fetch from the Collection API, build the index, write KB documents (~1 min)
 pnpm kb:sync              # embed the documents into the Knowledge Base (~5 min)
 pnpm user:create you@example.org   # self sign-up is off; Cognito emails a temporary password
-pnpm web                  # http://localhost:4321
+pnpm web                  # optional: the same site locally, at http://localhost:4321
 ```
+
+**The site's domain** is `WEB_DOMAIN` in [`functions/lib/auth/constants.ts`](functions/lib/auth/constants.ts): change it to a name you control. DNS can be hosted anywhere. The first deploy needs two records, made by hand:
+
+1. While `CollectionSearch-Domain` waits for its certificate, add the validation CNAME that ACM asks for (`aws acm describe-certificate --certificate-arn … --query 'Certificate.DomainValidationOptions[0].ResourceRecord'`). The deploy carries on once ACM issues the certificate, usually within minutes.
+2. Point a CNAME for the domain at the `RegionalDomainName` output of `CollectionSearch-Domain`.
+
+Teardown keeps that stack, so both records stay valid and a rebuild needs no DNS changes.
 
 An optional Collection API key raises the rate limits: set `NMA_API_KEY` for `pnpm fetch-sample`. The ingest works without one.
 
@@ -111,7 +122,7 @@ pnpm teardown --dry-run   # what would be deleted
 pnpm teardown             # asks you to type the project name
 ```
 
-This deletes every stack except `Ci`. It then removes leftover log groups and switches off Bedrock invocation logging if this project switched it on. It finishes with `pnpm status`, which should show nothing billed by the hour.
+This deletes every stack except `Ci` and `Domain`, which are free to keep. It then removes leftover log groups and switches off Bedrock invocation logging if this project switched it on. It finishes with `pnpm status`, which should show nothing billed by the hour.
 
 ## Cost
 
@@ -122,9 +133,10 @@ USD in Sydney, from AWS list prices. These are estimates, not a bill.
 | OpenSearch: 1 × `m7g.medium.search`, 10 GB | **about $2.09 a day (about $63 a month)** |
 | Bedrock embeddings, one full KB sync       | about $0.03                               |
 | Ask: one question (Haiku 4.5 + Guardrail)  | a fraction of a cent                      |
-| Two secrets, 11 alarms                     | about $1.90 a month                       |
+| Two secrets, 13 alarms                     | about $2.10 a month                       |
 | Cognito Essentials                         | free tier (10,000 monthly active users)   |
 | API Gateway, Lambda, DynamoDB, S3, logs    | cents at demo traffic                     |
+| Site certificate and custom domain         | free                                      |
 
 The domain is the only hourly cost, so the plan is to tear down between demos and rebuild from code. `pnpm status` lists anything billed by the hour in the region.
 
@@ -144,6 +156,7 @@ Each significant choice has an architecture decision record, with the options co
 10. [CI on every change, keyless deploys through GitHub OIDC](docs/adr/0010-ci-and-keyless-deploys.md)
 11. [Spec-first API: one OpenAPI file builds the gateway and types the code](docs/adr/0011-spec-first-openapi.md)
 12. [Data residency: everything in Sydney, generation within Australia, enforced by IAM](docs/adr/0012-data-residency.md)
+13. [Hosting the web front end: Lambda behind an HTTP API on a custom domain](docs/adr/0013-hosting-the-web-front-end.md)
 
 ## Evaluation
 
@@ -161,15 +174,15 @@ The latest run ([expanded-v2](evals/results/2026-11-11-expanded-v2.md)):
 
 ## Known limitations
 
-- **A slow Museum API hangs object pages.** The live fetch has no timeout. If the API is down, the page shows a clear error; if it's slow, the page waits. Next steps:
-  - a short timeout;
+- **Object pages depend on the Museum's API being up.** If it's down, or slower than 5 seconds, the page shows a clear error rather than the record. Next steps:
   - serve the cached copy with its "retrieved at" time;
   - fall back to our indexed copy of the record.
+- **Cold starts:** the first page after an idle spell takes about 1.5 seconds longer.
 - **Images:** the Museum's terms allow only API image URLs, hotlinked. Some records have images on the Museum's website that the API doesn't include. In our sample, none of the 39 spear-throwers, boomerangs, shields and coolamons have API images, against 56% of all sampled objects. Those pages link to the record instead, and the app doesn't scrape images.
 - **Retrieval still misses some wordings.** For example, "woomera" isn't linked to "spear-thrower" in the embeddings. Query expansion with the search synonyms fixed most cases (ADR 8). Hybrid keyword and vector retrieval would be next.
 - **Sign-out isn't instant revocation.** Access tokens stay valid until they expire, up to one hour (ADR 9).
 - **The trust boundary for deploys is `main`.** CloudFormation's execution role is admin. ADR 10 lists the hardening steps: branch protection, an environment approval, a narrower bootstrap policy, and blocking network egress on runners.
-- **Localhost only, no MFA, one OpenSearch node, sample data** (see above).
+- **No MFA, one OpenSearch node, sample data** (see above).
 
 ## Built with Claude Code
 
