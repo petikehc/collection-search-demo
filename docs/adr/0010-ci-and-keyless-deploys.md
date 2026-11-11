@@ -33,10 +33,11 @@ The usual shortcut, an IAM user's access keys stored as GitHub secrets, gives us
 
 **The deploy role (`CollectionSearch-Ci` stack):**
 
-- Trusts GitHub's OIDC provider, with `aud = sts.amazonaws.com` and `sub = repo:<owner>/<repo>:ref:refs/heads/main`. A fork, a pull request or another branch can't assume it.
+- Trusts GitHub's OIDC provider, with `aud = sts.amazonaws.com` and `sub = repo:<owner>@<ownerId>/<repo>@<repoId>:ref:refs/heads/main`. A fork, a pull request or another branch can't assume it.
+- That `sub` is GitHub's **immutable subject**, the default for new repositories, which adds the owner and repository IDs. A repository deleted or renamed and then re-created under the same name gets new IDs, so it can't assume the role either. The first deploy run failed because the role still trusted the older form without IDs: STS answered only "Not authorized to perform sts:AssumeRoleWithWebIdentity", and the subject GitHub actually sends came from `gh api repos/<owner>/<repo>/actions/oidc/customization/sub`.
 - Can do one thing: assume the CDK bootstrap roles (deploy, file publishing, lookup). Those roles are what `cdk deploy` uses anyway, so what a deploy may change is decided in one place, the bootstrap.
 - Its ARN is a repository **variable**, not written in the workflow file.
-- The repository name comes from `-c githubRepo=…` locally, or `GITHUB_REPOSITORY` in Actions. No owner or account is in the code.
+- The stack is deployed by hand with `-c githubSubjectPrefix=…`, read from that same `gh api` call. No owner or account is in the code.
 
 **Supply chain:**
 

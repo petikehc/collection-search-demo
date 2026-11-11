@@ -10,7 +10,10 @@ const env = { account: '111111111111', region: 'ap-southeast-2' };
 
 describe('CiStack', () => {
   const template = Template.fromStack(
-    new CiStack(new App({ context }), 'Ci', { env, githubRepo: 'example-owner/example-repo' }),
+    new CiStack(new App({ context }), 'Ci', {
+      env,
+      githubSubjectPrefix: 'repo:example-owner@123/example-repo@456',
+    }),
   );
   const [role] = Object.values(template.findResources('AWS::IAM::Role'));
   const [policy] = Object.values(template.findResources('AWS::IAM::Policy'));
@@ -29,7 +32,7 @@ describe('CiStack', () => {
       StringEquals: {
         'token.actions.githubusercontent.com:aud': 'sts.amazonaws.com',
         'token.actions.githubusercontent.com:sub':
-          'repo:example-owner/example-repo:ref:refs/heads/main',
+          'repo:example-owner@123/example-repo@456:ref:refs/heads/main',
       },
     });
   });
@@ -45,10 +48,25 @@ describe('CiStack', () => {
     expect(resources).not.toContain('*');
   });
 
-  it('refuses a repository that is not owner/name', () => {
-    expect(
-      () => new CiStack(new App({ context }), 'Bad', { env, githubRepo: 'repo:*:ref:*' }),
-    ).toThrow(/owner\/name/);
+  it('also accepts the older subject without IDs', () => {
+    const legacy = new CiStack(new App({ context }), 'Legacy', {
+      env,
+      githubSubjectPrefix: 'repo:example-owner/example-repo',
+    });
+    expect(JSON.stringify(Template.fromStack(legacy).toJSON())).toContain(
+      '"repo:example-owner/example-repo:ref:refs/heads/main"',
+    );
+  });
+
+  it.each([
+    'repo:*:ref:*',
+    'example-owner/example-repo',
+    'repo:example-owner/example-repo:ref:refs/heads/dev',
+    'repo:example-owner@abc/example-repo',
+  ])('refuses the subject prefix %s', (githubSubjectPrefix) => {
+    expect(() => new CiStack(new App({ context }), 'Bad', { env, githubSubjectPrefix })).toThrow(
+      /repo:owner\/name/,
+    );
   });
 });
 
@@ -56,15 +74,10 @@ describe('the app', () => {
   const stackIds = (app: App) => app.node.children.filter(Stack.isStack).map((s) => s.stackName);
 
   it('adds the Ci stack only when it knows which repository to trust', () => {
-    const saved = process.env.GITHUB_REPOSITORY;
-    delete process.env.GITHUB_REPOSITORY;
-    try {
-      expect(stackIds(buildApp(new App({ context })))).not.toContain('CollectionSearch-Ci');
-      expect(
-        stackIds(buildApp(new App({ context: { ...context, githubRepo: 'example-owner/x' } }))),
-      ).toContain('CollectionSearch-Ci');
-    } finally {
-      if (saved !== undefined) process.env.GITHUB_REPOSITORY = saved;
-    }
+    expect(stackIds(buildApp(new App({ context })))).not.toContain('CollectionSearch-Ci');
+    const githubSubjectPrefix = 'repo:example-owner@1/x@2';
+    expect(stackIds(buildApp(new App({ context: { ...context, githubSubjectPrefix } })))).toContain(
+      'CollectionSearch-Ci',
+    );
   });
 });
