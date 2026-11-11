@@ -109,3 +109,27 @@ async function aliasTargets(client: Client, alias: string): Promise<string[]> {
   if (!exists.body) return [];
   return Object.keys((await client.indices.getAlias(scope)).body);
 }
+
+/**
+ * Every object stored in one index (not the alias), without its derived fields, in pages sorted
+ * by ID. For rebuilding the index after a mapping change without fetching from the Museum
+ * again, which would also change which objects are in the sample.
+ */
+export async function readObjects(client: Client, index: string): Promise<CollectionObject[]> {
+  const pageSize = 1000;
+  const objects: CollectionObject[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const res = await client.search({
+      index,
+      body: {
+        from,
+        size: pageSize,
+        sort: [{ id: 'asc' }],
+        _source: { excludes: ['embedding', 'hasImage'] },
+      },
+    });
+    const hits = res.body.hits.hits;
+    objects.push(...hits.map((hit) => hit._source as CollectionObject));
+    if (hits.length < pageSize) return objects;
+  }
+}
