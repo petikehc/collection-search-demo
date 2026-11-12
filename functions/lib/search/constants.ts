@@ -8,6 +8,12 @@ export const OBJECTS_ALIAS = 'objects';
 export const HYBRID_PIPELINE = 'objects-hybrid';
 /** Weights for [keyword, vector] scores after L2 normalisation, chosen with `pnpm eval:search`. */
 export const HYBRID_WEIGHTS = [0.6, 0.4];
+/**
+ * For questions: towards meaning. A question's common words ("what", "did", "people", "use")
+ * match unrelated records, which the keyword weights ranked above the right ones.
+ */
+export const HYBRID_QUESTION_PIPELINE = 'objects-hybrid-question';
+export const HYBRID_QUESTION_WEIGHTS = [0.2, 0.8];
 /** Nearest neighbours the vector half contributes. */
 export const HYBRID_NEIGHBOURS = 30;
 /** How many keyword hits are ranked against the neighbours; also the deepest result reachable. */

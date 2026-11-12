@@ -6,7 +6,9 @@
  *
  * Two measures, because hybrid search can fail in two directions:
  * - Questions (evals/questions.jsonl, the answerable ones): recall@10 and hit@10 of the objects
- *   each question should find. Keyword search is weak here; the vector half should fix it.
+ *   each question should find, and how high the first one ranks (MRR, hit@3): recall@10 alone
+ *   missed questions whose right objects sat below five keyword look-alikes.
+ *   Keyword search is weak here; the vector half should fix it.
  * - Keywords (evals/search-keywords.json): of the first 10 results, the share that contain the
  *   words at all. Keyword search scores 100% by definition; hybrid must not trade that away by
  *   ranking look-alikes above exact matches.
@@ -50,15 +52,27 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / (xs.length || 1);
 
 const questionRows: string[] = [];
 const totals = Object.fromEntries(
-  MODES.map((m) => [m, { recall: [] as number[], hit: [] as number[], ms: [] as number[] }]),
+  MODES.map((m) => [
+    m,
+    {
+      recall: [] as number[],
+      hit: [] as number[],
+      rr: [] as number[],
+      hit3: [] as number[],
+      ms: [] as number[],
+    },
+  ]),
 );
 for (const c of questions) {
   const cells: string[] = [];
   for (const mode of MODES) {
     const res = await search(c.question, mode);
     const recall = recallAt(c.expectedObjectIds ?? [], ids(res), TOP);
+    const first = ids(res).findIndex((id) => (c.expectedObjectIds ?? []).includes(id));
     totals[mode]?.recall.push(recall);
     totals[mode]?.hit.push(recall > 0 ? 1 : 0);
+    totals[mode]?.rr.push(first >= 0 ? 1 / (first + 1) : 0);
+    totals[mode]?.hit3.push(first >= 0 && first < 3 ? 1 : 0);
     totals[mode]?.ms.push(res.ms);
     cells.push(pct(recall));
   }
@@ -84,15 +98,15 @@ for (const q of keywords) {
 const date = new Date().toISOString().slice(0, 10);
 const summary = MODES.map((mode) => {
   const t = totals[mode];
-  return `| ${mode} | ${pct(mean(t?.recall ?? []))} | ${pct(mean(t?.hit ?? []))} | ${mode === 'keyword' ? '100%' : pct(mean(precision))} | ${Math.round(mean(t?.ms ?? []))} ms |`;
+  return `| ${mode} | ${pct(mean(t?.recall ?? []))} | ${pct(mean(t?.hit ?? []))} | ${mean(t?.rr ?? []).toFixed(2)} | ${pct(mean(t?.hit3 ?? []))} | ${mode === 'keyword' ? '100%' : pct(mean(precision))} | ${Math.round(mean(t?.ms ?? []))} ms |`;
 });
 const lines = [
   `# Search eval: ${values.label} (${date})`,
   '',
   `${questions.length} questions and ${keywords.length} keyword queries, through the deployed \`GET /search\`.`,
   '',
-  `| Mode | Question recall@${TOP} | Question hit@${TOP} | Keyword precision@${TOP} | Mean round trip |`,
-  '| --- | --- | --- | --- | --- |',
+  `| Mode | Question recall@${TOP} | Question hit@${TOP} | Question MRR | Question hit@3 | Keyword precision@${TOP} | Mean round trip |`,
+  '| --- | --- | --- | --- | --- | --- | --- |',
   ...summary,
   '',
   '## Questions',

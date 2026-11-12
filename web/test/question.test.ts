@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isPersonsAction, looksLikeQuestion } from '../src/lib/question.js';
+import { looksLikeQuestion } from '../../functions/lib/search/question.js';
+import { isPersonsAction } from '../src/lib/question.js';
 
 describe('looksLikeQuestion', () => {
   it.each([

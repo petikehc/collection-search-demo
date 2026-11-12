@@ -110,7 +110,9 @@ describe('SearchStack ingest', () => {
   });
 
   it('creates the hybrid search pipeline: L2 normalisation, weighted towards keywords', () => {
-    const [pipeline] = Object.values(template.findResources('Custom::OpenSearchSearchPipeline'));
+    const pipeline = Object.values(template.findResources('Custom::OpenSearchSearchPipeline')).find(
+      (p) => p.Properties.PipelineName === 'objects-hybrid',
+    );
     expect(pipeline?.Properties.PipelineName).toBe('objects-hybrid');
     expect(JSON.parse(pipeline?.Properties.Definition)).toMatchObject({
       phase_results_processors: [
@@ -120,6 +122,17 @@ describe('SearchStack ingest', () => {
             combination: { technique: 'arithmetic_mean', parameters: { weights: [0.6, 0.4] } },
           },
         },
+      ],
+    });
+  });
+
+  it('creates a second pipeline for questions, weighted towards meaning', () => {
+    const question = Object.values(template.findResources('Custom::OpenSearchSearchPipeline')).find(
+      (p) => p.Properties.PipelineName === 'objects-hybrid-question',
+    );
+    expect(JSON.parse(question?.Properties.Definition)).toMatchObject({
+      phase_results_processors: [
+        { 'normalization-processor': { combination: { parameters: { weights: [0.2, 0.8] } } } },
       ],
     });
   });

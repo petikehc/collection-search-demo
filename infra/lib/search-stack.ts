@@ -17,6 +17,8 @@ import { KB_PREFIX } from '../../functions/lib/kb/documents.js';
 import {
   EMBEDDING_MODEL_ID,
   HYBRID_PIPELINE,
+  HYBRID_QUESTION_PIPELINE,
+  HYBRID_QUESTION_WEIGHTS,
   HYBRID_WEIGHTS,
   OBJECTS_ALIAS,
 } from '../../functions/lib/search/constants.js';
@@ -126,26 +128,37 @@ export class SearchStack extends Stack {
     // mean. L2 with these weights kept exact keyword matches on top where min-max didn't
     // (docs/adr/0014-hybrid-search.md). The objects index names this pipeline as
     // its default, so it must exist before the first ingest.
-    new OpenSearchSearchPipeline(this, 'HybridPipeline', {
-      provider: this.openSearchRoles,
-      domain: this.domain,
-      adminRole: this.adminRole,
-      pipelineName: HYBRID_PIPELINE,
-      definition: {
-        description: 'Combines keyword and vector scores for hybrid search',
-        phase_results_processors: [
-          {
-            'normalization-processor': {
-              normalization: { technique: 'l2' },
-              combination: {
-                technique: 'arithmetic_mean',
-                parameters: { weights: HYBRID_WEIGHTS },
+    const hybridPipeline = (id: string, name: string, weights: number[], description: string) =>
+      new OpenSearchSearchPipeline(this, id, {
+        provider: this.openSearchRoles,
+        domain: this.domain,
+        adminRole: this.adminRole,
+        pipelineName: name,
+        definition: {
+          description,
+          phase_results_processors: [
+            {
+              'normalization-processor': {
+                normalization: { technique: 'l2' },
+                combination: { technique: 'arithmetic_mean', parameters: { weights } },
               },
             },
-          },
-        ],
-      },
-    });
+          ],
+        },
+      });
+    hybridPipeline(
+      'HybridPipeline',
+      HYBRID_PIPELINE,
+      HYBRID_WEIGHTS,
+      'Combines keyword and vector scores for hybrid search',
+    );
+    // Questions rank by meaning: the search Lambda picks this one when the query looks like one.
+    hybridPipeline(
+      'HybridQuestionPipeline',
+      HYBRID_QUESTION_PIPELINE,
+      HYBRID_QUESTION_WEIGHTS,
+      'Hybrid search for questions, weighted towards meaning',
+    );
 
     // Private, encrypted, TLS-only. SSE-S3 (not KMS) keeps ETags equal to the MD5 of the content,
     // which the ingest uses to skip unchanged files. Emptied and deleted with the stack.

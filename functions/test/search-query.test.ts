@@ -6,6 +6,7 @@ import {
   type OpenSearchSearchBody,
   parseSearchParams,
   type SearchParams,
+  searchPath,
   toSearchResponse,
 } from '../lib/search/query.js';
 
@@ -50,6 +51,20 @@ describe('parseSearchParams', () => {
     // The same page is fine for keyword search, and for browsing, which is never hybrid.
     expect(parseSearchParams({ ...beyond, mode: 'keyword' })).toMatchObject({ ok: true });
     expect(parseSearchParams({ page: beyond.page })).toMatchObject({ ok: true });
+  });
+});
+
+describe('searchPath', () => {
+  it('ranks questions by meaning, through the question pipeline', () => {
+    expect(searchPath({ q: 'What did people use to start fires?', mode: 'hybrid' })).toBe(
+      '/objects/_search?search_pipeline=objects-hybrid-question',
+    );
+  });
+
+  it("uses the index's default pipeline for keywords, browsing and keyword mode", () => {
+    expect(searchPath({ q: 'woomera', mode: 'hybrid' })).toBe('/objects/_search');
+    expect(searchPath({ mode: 'hybrid' })).toBe('/objects/_search');
+    expect(searchPath({ q: 'What is a woomera?', mode: 'keyword' })).toBe('/objects/_search');
   });
 });
 

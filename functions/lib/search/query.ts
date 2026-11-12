@@ -1,5 +1,11 @@
 import type { components } from '../api/types.gen.js';
-import { HYBRID_DEPTH, HYBRID_NEIGHBOURS } from './constants.js';
+import {
+  HYBRID_DEPTH,
+  HYBRID_NEIGHBOURS,
+  HYBRID_QUESTION_PIPELINE,
+  OBJECTS_ALIAS,
+} from './constants.js';
+import { looksLikeQuestion } from './question.js';
 
 type SearchResponse = components['schemas']['SearchResponse'];
 type SearchResult = components['schemas']['SearchResult'];
@@ -115,6 +121,17 @@ export function parseSearchParams(raw: Record<string, string | undefined> | null
     };
   }
   return { ok: true, params: valid };
+}
+
+/**
+ * Where to send the search. A hybrid search for a question uses the question pipeline
+ * (weighted towards meaning); every other search uses the index's default pipeline.
+ */
+export function searchPath(params: Pick<SearchParams, 'q' | 'mode'>): string {
+  const path = `/${OBJECTS_ALIAS}/_search`;
+  return isHybrid(params) && looksLikeQuestion(params.q)
+    ? `${path}?search_pipeline=${HYBRID_QUESTION_PIPELINE}`
+    : path;
 }
 
 /** Hybrid needs words to embed: browsing (no `q`) and `mode=keyword` are keyword-only. */
