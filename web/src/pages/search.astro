@@ -1,0 +1,276 @@
+---
+import BookmarkButton from '../components/BookmarkButton.astro';
+import FilterMenu from '../components/FilterMenu.astro';
+import Icon from '../components/Icon.astro';
+import ObjectDetail from '../components/ObjectDetail.astro';
+import SearchBox from '../components/SearchBox.astro';
+import Base from '../layouts/Base.astro';
+import { ApiError, listBookmarks, type SearchResponse, search } from '../lib/api.js';
+import { getObject } from '../lib/museum.js';
+import { readSearch, searchUrl, withFilter } from '../lib/search-url.js';
+
+const PAGE_SIZE = 20;
+/** Hybrid search ranks the best 200 matches (ADR 14), so its pages stop there. */
+const HYBRID_DEPTH = 200;
+
+const { user } = Astro.locals;
+const state = readSearch(Astro.url.searchParams);
+const here = searchUrl(state);
+
+const [searchResult, objectResult, bookmarksResult] = await Promise.allSettled([
+  search({
+    q: state.q,
+    type: state.type,
+    place: state.place,
+    yearFrom: state.yearFrom,
+    yearTo: state.yearTo,
+    hasImage: state.hasImage,
+    page: state.page,
+    size: PAGE_SIZE,
+  }),
+  state.id ? getObject(state.id) : Promise.resolve(null),
+  user ? listBookmarks(user.accessToken) : Promise.resolve([]),
+]);
+
+let result: SearchResponse | undefined;
+let error: string | undefined;
+if (searchResult.status === 'fulfilled') {
+  result = searchResult.value;
+} else {
+  const err = searchResult.reason;
+  error =
+    err instanceof ApiError && err.status === 400
+      ? err.message
+      : err instanceof ApiError && err.status === 429
+        ? 'Search is busy right now. Please try again in a moment.'
+        : 'Search is unavailable right now. Please try again shortly.';
+  if (!(err instanceof ApiError && err.status < 500)) console.error('search failed', err);
+  Astro.response.status = err instanceof ApiError && err.status === 400 ? 400 : 503;
+}
+const selected = objectResult.status === 'fulfilled' ? objectResult.value : null;
+const selectedFailed = objectResult.status === 'rejected';
+if (selectedFailed) console.error('museum lookup failed', objectResult.reason);
+const bookmarked = new Set(
+  bookmarksResult.status === 'fulfilled' ? bookmarksResult.value.map((b) => b.objectId) : [],
+);
+
+// What the count says: keyword matches, plus related objects in a hybrid search.
+const fmt = (n: number) => n.toLocaleString('en-AU');
+const related = result ? result.total - result.keywordTotal : 0;
+const countText = !result
+  ? ''
+  : result.mode === 'hybrid'
+    ? result.keywordTotal === 0
+      ? `No objects match those words; ${fmt(result.total)} are related by meaning`
+      : `${fmt(result.keywordTotal)} ${result.keywordTotal === 1 ? 'object matches' : 'objects match'}${related > 0 ? `, and ${fmt(related)} more are related` : ''}`
+    : `${fmt(result.total)}${result.total >= 10_000 ? ' or more' : ''} ${result.total === 1 ? 'object' : 'objects'}`;
+const page = result?.page ?? 1;
+const maxResults = result?.mode === 'hybrid' ? HYBRID_DEPTH : 100 * PAGE_SIZE;
+const lastPage = result
+  ? Math.max(1, Math.ceil(Math.min(result.total, maxResults) / PAGE_SIZE))
+  : 1;
+
+// Filters: the active ones as removable chips, the others as dropdowns.
+const chips = [
+  state.type && { label: `Type: ${state.type}`, href: withFilter(state, { type: undefined }) },
+  state.place && { label: `Place: ${state.place}`, href: withFilter(state, { place: undefined }) },
+  state.yearFrom !== undefined && {
+    label: `${state.yearFrom}s`,
+    href: withFilter(state, { yearFrom: undefined, yearTo: undefined }),
+  },
+  state.hasImage && { label: 'With images only', href: withFilter(state, { hasImage: undefined }) },
+].filter(Boolean) as { label: string; href: string }[];
+const menus = result
+  ? [
+      !state.type && {
+        label: 'Type',
+        options: result.facets.types.map((f) => ({
+          label: f.value,
+          count: f.count,
+          href: withFilter(state, { type: f.value }),
+        })),
+      },
+      !state.place && {
+        label: 'Place',
+        options: result.facets.places.map((f) => ({
+          label: f.value,
+          count: f.count,
+          href: withFilter(state, { place: f.value }),
+        })),
+      },
+      state.yearFrom === undefined && {
+        label: 'Decade',
+        options: result.facets.decades.map((d) => ({
+          label: `${d.decade}s`,
+          count: d.count,
+          href: withFilter(state, { yearFrom: d.decade, yearTo: d.decade + 9 }),
+        })),
+      },
+    ].filter(Boolean)
+  : [];
+const title = state.q ? `“${state.q}”` : 'Browse the collection';
+---
+
+<Base title={title} noindex>
+  <div slot="band" class="container results-band">
+    <SearchBox value={state.q} keep={{}} />
+    <div class="filter-row">
+      {
+        chips.map((c) => (
+          <a class="chip" href={c.href} rel="nofollow" aria-label={`Remove filter: ${c.label}`}>
+            <span>{c.label}</span>
+            <Icon name="close" />
+          </a>
+        ))
+      }
+      {menus.map((m) => m && <FilterMenu label={m.label} options={m.options} />)}
+      {
+        !state.hasImage && (
+          <a class="filter-link" href={withFilter(state, { hasImage: true })} rel="nofollow">
+            With images only
+          </a>
+        )
+      }
+    </div>
+  </div>
+
+  <div class:list={['container results-layout', selected && 'has-selection']}>
+    <h1 class="visually-hidden">{state.q ? `Results for “${state.q}”` : 'Browse the collection'}</h1>
+
+    <section class="results-list" aria-label="Results">
+      {error && <p class="message error" role="alert">{error}</p>}
+      {result && <p class="muted results-count">{countText}</p>}
+      {
+        result && result.results.length === 0 && (
+          <p class="message">
+            Nothing matches. Try fewer words, or <a href="/search">browse everything</a>.
+          </p>
+        )
+      }
+      {
+        result && (
+          <ol class="results">
+            {result.results.map((r) => (
+              <li class:list={['result', r.id === state.id && 'selected']}>
+                {r.thumbnail ? (
+                  <img src={r.thumbnail.url} alt="" loading="lazy" width="80" height="80" />
+                ) : (
+                  <span class="no-image">No image</span>
+                )}
+                <div class="result-text">
+                  <a
+                    class="result-title"
+                    href={searchUrl(state, { id: r.id })}
+                    aria-current={r.id === state.id ? 'true' : undefined}
+                    rel="nofollow"
+                    data-pane-link
+                  >
+                    {r.title}
+                  </a>
+                  <span class="muted small">
+                    {[r.types[0], r.dateLabel, r.places[0]].filter(Boolean).join(', ')}
+                  </span>
+                  {r.highlight && <span class="snippet" set:html={r.highlight} />}
+                </div>
+                <BookmarkButton
+                  objectId={r.id}
+                  title={r.title}
+                  bookmarked={bookmarked.has(r.id)}
+                  returnTo={searchUrl(state)}
+                />
+              </li>
+            ))}
+          </ol>
+        )
+      }
+      {
+        result && lastPage > 1 && (
+          <nav class="pager" aria-label="Pages">
+            {page > 1 ? (
+              <a href={searchUrl(state, { page: page - 1, id: undefined })} rel="nofollow">
+                Previous
+              </a>
+            ) : (
+              <span />
+            )}
+            <span class="muted">
+              Page {page} of {lastPage}
+              {result.mode === 'hybrid' && result.total > maxResults && ', the best 200 matches'}
+            </span>
+            {page < lastPage ? (
+              <a href={searchUrl(state, { page: page + 1, id: undefined })} rel="nofollow">
+                Next
+              </a>
+            ) : (
+              <span />
+            )}
+          </nav>
+        )
+      }
+    </section>
+
+    <section id="pane" class="pane paper" aria-label="Selected object" aria-live="polite">
+      {
+        selected ? (
+          <>
+            <a class="back-link pane-back" href={searchUrl(state, { id: undefined })}>
+              <Icon name="back" />
+              Back to results
+            </a>
+            <ObjectDetail
+              object={selected}
+              bookmarked={bookmarked.has(selected.id)}
+              returnTo={here}
+              headingLevel={2}
+            />
+          </>
+        ) : selectedFailed ? (
+          <p class="message error" role="alert">
+            The Museum's Collection API isn't responding, so this record can't be shown. Please try
+            again shortly.
+          </p>
+        ) : (
+          <p class="muted pane-empty">Select an object to see its record here.</p>
+        )
+      }
+    </section>
+  </div>
+</Base>
+
+<script>
+  // Desktop only: load a clicked result into the right-hand pane without reloading the list.
+  // Plain links still work without this (and on a phone, where the object replaces the list).
+  const wide = window.matchMedia('(min-width: 56rem)');
+  document.addEventListener('click', async (event) => {
+    const link = (event.target as Element).closest<HTMLAnchorElement>('a[data-pane-link]');
+    if (!link || !wide.matches || event.metaKey || event.ctrlKey || event.shiftKey) return;
+    event.preventDefault();
+    const pane = document.getElementById('pane');
+    pane?.setAttribute('aria-busy', 'true');
+    try {
+      const res = await fetch(link.href, { headers: { accept: 'text/html' } });
+      const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+      const next = doc.getElementById('pane');
+      if (!pane || !next) throw new Error('no pane');
+      pane.replaceWith(next);
+      document.querySelectorAll('.result.selected').forEach((li) => li.classList.remove('selected'));
+      document.querySelectorAll('a[data-pane-link][aria-current]').forEach((a) => a.removeAttribute('aria-current'));
+      link.closest('.result')?.classList.add('selected');
+      link.setAttribute('aria-current', 'true');
+      history.pushState({}, '', link.href);
+      next.querySelector('h2')?.focus({ preventScroll: true });
+    } catch {
+      window.location.href = link.href;
+    }
+  });
+  window.addEventListener('popstate', () => window.location.reload());
+
+  // One dropdown open at a time; Escape or a click elsewhere closes it.
+  const menus = () => document.querySelectorAll<HTMLDetailsElement>('details.filter-menu');
+  document.addEventListener('click', (event) => {
+    for (const d of menus()) if (!d.contains(event.target as Node)) d.open = false;
+  });
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') for (const d of menus()) d.open = false;
+  });
+</script>
