@@ -1,0 +1,62 @@
+---
+import { ApiError, type AskResponse, ask } from '../lib/api.js';
+import { searchUrl } from '../lib/search-url.js';
+import Icon from './Icon.astro';
+
+/**
+ * The AI answer, rendered as a server island: the results show at once, and this arrives in
+ * its own slot 2–4 seconds later. Each render takes one answer from the daily allowance.
+ */
+interface Props {
+  question: string;
+}
+const { question } = Astro.props;
+
+let answer: AskResponse | undefined;
+let error: string | undefined;
+try {
+  answer = await ask(question);
+} catch (err) {
+  // The API's 429 says which limit: the per-second throttle, or today's allowance.
+  error =
+    err instanceof ApiError && err.status === 429
+      ? err.message === 'Limit Exceeded'
+        ? 'Too many questions at once. Please try again in a moment.'
+        : err.message
+      : 'Answers are unavailable right now. The results still work.';
+  if (!(err instanceof ApiError && err.status === 429)) console.error('ask failed', err);
+}
+const blocked = answer?.guardrailAction === 'INTERVENED';
+---
+
+<div class="answer">
+  <p class="answer-label"><Icon name="sparkle" /> AI answer</p>
+  <h2>{question}</h2>
+  {error && <p class="message warn" role="status">{error}</p>}
+  {
+    answer && (
+      <>
+        <p class="answer-text">{answer.answer}</p>
+        {blocked && <p class="muted small">A safety check stopped this question or answer.</p>}
+        {answer.citations.length > 0 && (
+          <div class="citations">
+            <h3>Based on these records</h3>
+            <ul>
+              {answer.citations.map((c) => (
+                <li>
+                  <a href={searchUrl({ q: question, id: c.objectId })} rel="nofollow" data-pane-link>
+                    {c.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <p class="message warn small">
+          Written by an AI model using only the records above. It can still be wrong, so check the
+          records it cites.
+        </p>
+      </>
+    )
+  }
+</div>
