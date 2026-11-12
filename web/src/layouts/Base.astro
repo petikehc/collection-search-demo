@@ -24,7 +24,7 @@ const site = Astro.site ?? Astro.url;
 const pageUrl = new URL(Astro.url.pathname + Astro.url.search, site).href;
 // One share image for every page. Not the Museum's images: platforms copy and cache shared
 // images, and the Museum's terms allow its images only hotlinked, alongside the record.
-const shareImage = new URL('/og.png', site).href;
+const shareImage = new URL('/og-2.png', site).href;
 const { user } = Astro.locals;
 const here = Astro.url.pathname + Astro.url.search;
 const showNotice = Astro.cookies.get(NOTICE_COOKIE)?.value !== 'dismissed';
