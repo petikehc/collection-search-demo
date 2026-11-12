@@ -297,7 +297,12 @@ function toResult({ _source: s, highlight }: Hit): SearchResult {
     yearStart: s.yearStart,
     yearEnd: s.yearEnd,
     thumbnail: image?.thumbnailUrl
-      ? { url: image.thumbnailUrl, rightsTitle: image.rightsTitle, rightsUrl: image.rightsUrl }
+      ? {
+          url: image.thumbnailUrl,
+          previewUrl: image.previewUrl,
+          rightsTitle: image.rightsTitle,
+          rightsUrl: image.rightsUrl,
+        }
       : undefined,
     highlight: highlight?.physicalDescription?.[0],
     sourceUrl: s.sourceUrl ?? '',

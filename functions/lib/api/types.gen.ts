@@ -177,8 +177,10 @@ export interface components {
             retrievedAt: string;
         };
         Image: {
-            /** @description Hotlinked from the Museum; never copied */
+            /** @description Hotlinked from the Museum; never copied. A thumbnail, about 200 px wide */
             url: string;
+            /** @description The same image about 800 px wide, also hotlinked from the Museum: for anything shown larger than the thumbnail, or on a high-density screen (use both in a srcset) */
+            previewUrl?: string;
             rightsTitle: string;
             rightsUrl?: string;
         };

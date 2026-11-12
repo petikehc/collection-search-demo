@@ -78,7 +78,21 @@ const count = data ? data.total.toLocaleString('en-AU') : 'thousands of';
             {data.featured.map((o) => (
               <li>
                 <a href={`/object/${o.id}`}>
-                  <img src={o.thumbnail?.url} alt="" loading="lazy" width="320" height="240" />
+                  {/* The browser picks the 200 px thumbnail or the 800 px preview for the card's
+                      size and the screen's density: thumbnails alone looked soft. */}
+                  <img
+                    src={o.thumbnail?.url}
+                    srcset={
+                      o.thumbnail?.previewUrl
+                        ? `${o.thumbnail.url} 200w, ${o.thumbnail.previewUrl} 800w`
+                        : undefined
+                    }
+                    sizes="(max-width: 40rem) 90vw, (max-width: 60rem) 45vw, 17rem"
+                    alt=""
+                    loading="lazy"
+                    width="320"
+                    height="240"
+                  />
                   <span class="featured-title">{o.title}</span>
                   <span class="muted small">
                     {[o.types[0], o.dateLabel ?? o.places[0]].filter(Boolean).join(', ')}
