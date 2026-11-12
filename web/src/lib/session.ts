@@ -19,7 +19,9 @@ import {
   refreshTokens,
   revokeToken,
 } from '../../../functions/lib/auth/oauth.js';
+import { addBookmark } from './api.js';
 import { getConfig } from './config.js';
+import type { PendingBookmark } from './pending.js';
 
 export type User = NonNullable<App.Locals['user']>;
 
@@ -56,13 +58,19 @@ export function safeReturnTo(value: string | null | undefined): string {
  * safe: Astro only trusts the hosts in `security.allowedDomains`, and Cognito only redirects to
  * the callback URLs registered for the client.
  */
-export async function startLogin(cookies: AstroCookies, url: URL, returnTo: string): Promise<URL> {
+export async function startLogin(
+  cookies: AstroCookies,
+  url: URL,
+  returnTo: string,
+  /** A bookmark to save once signed in (the visitor clicked one while signed out). */
+  pending?: PendingBookmark,
+): Promise<URL> {
   const { loginBaseUrl, clientId } = await getConfig();
   const pkce = createPkce();
   const state = createState();
   cookies.set(
     COOKIE.login,
-    JSON.stringify({ verifier: pkce.verifier, state, returnTo: safeReturnTo(returnTo) }),
+    JSON.stringify({ verifier: pkce.verifier, state, returnTo: safeReturnTo(returnTo), pending }),
     cookieOptions(url, 600),
   );
   return authorizeUrl({
@@ -78,7 +86,7 @@ export async function startLogin(cookies: AstroCookies, url: URL, returnTo: stri
 /** Step 2: Cognito redirected back with a code. Check state, exchange the code, keep the tokens. */
 export async function finishLogin(cookies: AstroCookies, url: URL): Promise<string> {
   const login = cookies.get(COOKIE.login)?.json() as
-    | { verifier: string; state: string; returnTo: string }
+    | { verifier: string; state: string; returnTo: string; pending?: PendingBookmark }
     | undefined;
   cookies.delete(COOKIE.login, { path: '/' });
 
@@ -105,6 +113,13 @@ export async function finishLogin(cookies: AstroCookies, url: URL): Promise<stri
   cookies.set(COOKIE.id, tokens.id_token, cookieOptions(url, tokens.expires_in));
   if (tokens.refresh_token) {
     cookies.set(COOKIE.refresh, tokens.refresh_token, cookieOptions(url, 24 * HOUR));
+  }
+  // The bookmark that started this sign-in. Saving it is best effort: the visitor is signed in
+  // either way, and can press the button again.
+  if (login.pending) {
+    await addBookmark(tokens.access_token, login.pending.objectId, login.pending.title).catch(
+      (err) => console.error('pending bookmark failed', err),
+    );
   }
   return login.returnTo;
 }

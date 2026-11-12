@@ -20,8 +20,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
     locals.user = await currentUser(cookies, url);
   }
 
+  // GET only: a signed-out POST (a bookmark clicked) is handled by the page, which keeps the
+  // bookmark through sign-in.
   const isProtected = PROTECTED.some((p) => url.pathname === p || url.pathname.startsWith(`${p}/`));
-  if (isProtected && !locals.user) {
+  if (isProtected && !locals.user && request.method === 'GET') {
     return redirect(`/auth/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
   }
 
