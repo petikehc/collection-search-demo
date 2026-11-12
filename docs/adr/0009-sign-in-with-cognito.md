@@ -1,6 +1,6 @@
 # 9. Sign-in with Cognito: managed login, code grant with PKCE, scopes checked at the gateway
 
-- Status: accepted; Ask no longer needs sign-in ([ADR 15](0015-ask-without-sign-in.md))
+- Status: accepted; Ask no longer needs sign-in ([ADR 15](0015-ask-without-sign-in.md)); sign-up is open and favourites are bookmarks ([ADR 16](0016-bookmarks-and-self-sign-up.md))
 - Date: 2026-11-11
 
 ## Context

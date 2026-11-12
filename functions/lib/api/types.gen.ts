@@ -46,15 +46,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/favourites": {
+    "/bookmarks": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** The signed-in user's favourite objects, newest first */
-        get: operations["listFavourites"];
+        /** The signed-in user's bookmarked objects, newest first */
+        get: operations["listBookmarks"];
         put?: never;
         post?: never;
         delete?: never;
@@ -63,7 +63,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/favourites/{objectId}": {
+    "/bookmarks/{objectId}": {
         parameters: {
             query?: never;
             header?: never;
@@ -74,11 +74,11 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
-        /** Add an object to the signed-in user's favourites (repeating it is harmless) */
-        put: operations["addFavourite"];
+        /** Add an object to the signed-in user's bookmarks (repeating it is harmless) */
+        put: operations["addBookmark"];
         post?: never;
-        /** Remove an object from the signed-in user's favourites (removing a missing one is harmless) */
-        delete: operations["removeFavourite"];
+        /** Remove an object from the signed-in user's bookmarks (removing a missing one is harmless) */
+        delete: operations["removeBookmark"];
         options?: never;
         head?: never;
         patch?: never;
@@ -124,17 +124,17 @@ export interface components {
             guardrailAction: "NONE" | "INTERVENED";
             attribution: string;
         };
-        FavouriteRequest: {
+        BookmarkRequest: {
             title: string;
         };
-        Favourite: {
+        Bookmark: {
             objectId: string;
             title: string;
             /** Format: date-time */
             addedAt: string;
         };
-        FavouritesResponse: {
-            favourites: components["schemas"]["Favourite"][];
+        BookmarksResponse: {
+            bookmarks: components["schemas"]["Bookmark"][];
         };
         Health: {
             /** @enum {string} */
@@ -294,7 +294,7 @@ export interface operations {
             };
         };
     };
-    listFavourites: {
+    listBookmarks: {
         parameters: {
             query?: never;
             header?: never;
@@ -303,20 +303,20 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The user's favourites */
+            /** @description The user's bookmarks */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FavouritesResponse"];
+                    "application/json": components["schemas"]["BookmarksResponse"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
         };
     };
-    addFavourite: {
+    addBookmark: {
         parameters: {
             query?: never;
             header?: never;
@@ -328,7 +328,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["FavouriteRequest"];
+                "application/json": components["schemas"]["BookmarkRequest"];
             };
         };
         responses: {
@@ -338,7 +338,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Favourite"];
+                    "application/json": components["schemas"]["Bookmark"];
                 };
             };
             400: components["responses"]["BadRequest"];
@@ -346,7 +346,7 @@ export interface operations {
             403: components["responses"]["Forbidden"];
         };
     };
-    removeFavourite: {
+    removeBookmark: {
         parameters: {
             query?: never;
             header?: never;

@@ -15,11 +15,47 @@ describe('AuthStack', () => {
   );
   const client = (name: string) => clients.find((c) => c.ClientName === name);
 
-  it('has no sign-up page: only an admin can create users', () => {
+  it('lets anyone sign up, confirming their email address with a code', () => {
     template.hasResourceProperties('AWS::Cognito::UserPool', {
-      AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
+      AdminCreateUserConfig: { AllowAdminCreateUserOnly: false },
+      AutoVerifiedAttributes: ['email'],
+      VerificationMessageTemplate: Match.objectLike({ DefaultEmailOption: 'CONFIRM_WITH_CODE' }),
       UserPoolTier: 'ESSENTIALS',
       UsernameAttributes: ['email'],
+    });
+    // Cognito's own sender (no SES): its daily limit also bounds emails a script could trigger.
+    const [pool] = Object.values(template.findResources('AWS::Cognito::UserPool'));
+    expect(pool?.Properties.EmailConfiguration?.EmailSendingAccount ?? 'COGNITO_DEFAULT').toBe(
+      'COGNITO_DEFAULT',
+    );
+  });
+
+  it('emails the owner about each new account, through a post-confirmation trigger', () => {
+    const [pool] = Object.values(template.findResources('AWS::Cognito::UserPool'));
+    expect(pool?.Properties.LambdaConfig).toHaveProperty('PostConfirmation');
+    template.hasResourceProperties('AWS::SNS::Subscription', {
+      Protocol: 'email',
+      Endpoint: { Ref: Match.stringLikeRegexp('alarmemail') },
+    });
+    const statements = Object.values(template.findResources('AWS::IAM::Policy')).flatMap(
+      (p) => p.Properties.PolicyDocument.Statement,
+    );
+    // The notifier may publish to the sign-ups topic and nothing else in SNS.
+    const sns = statements.filter((st) => JSON.stringify(st.Action).includes('sns:'));
+    expect(sns).toEqual([
+      expect.objectContaining({
+        Action: 'sns:Publish',
+        Resource: { Ref: expect.stringMatching(/^SignUps/) },
+      }),
+    ]);
+  });
+
+  it('alarms when sign-ups in a day look like scripts', () => {
+    template.hasResourceProperties('AWS::CloudWatch::Alarm', {
+      MetricName: 'NumberOfMessagesPublished',
+      Period: 86400,
+      Threshold: 20,
+      ComparisonOperator: 'GreaterThanThreshold',
     });
   });
 
@@ -31,10 +67,10 @@ describe('AuthStack', () => {
     template.resourceCountIs('AWS::Cognito::ManagedLoginBranding', 2);
   });
 
-  it('defines the favourites scope on the API resource server (Ask needs no sign-in)', () => {
+  it('defines the bookmarks scope on the API resource server (Ask needs no sign-in)', () => {
     template.hasResourceProperties('AWS::Cognito::UserPoolResourceServer', {
       Identifier: 'collection-search',
-      Scopes: [Match.objectLike({ ScopeName: 'favourites' })],
+      Scopes: [Match.objectLike({ ScopeName: 'bookmarks' })],
     });
   });
 
@@ -56,7 +92,7 @@ describe('AuthStack', () => {
       expect(c.AllowedOAuthScopes).toEqual([
         'openid',
         'email',
-        { 'Fn::Join': ['', [server, '/favourites']] },
+        { 'Fn::Join': ['', [server, '/bookmarks']] },
       ]);
     }
   });

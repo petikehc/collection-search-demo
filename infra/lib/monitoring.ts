@@ -23,7 +23,7 @@ export interface MonitoringProps {
   api: RestApiBase;
   searchFn: IFunction;
   askFn: IFunction;
-  favouritesFn: IFunction;
+  bookmarksFn: IFunction;
   ingestFn: IFunction;
   domain: Domain;
   /** Inference profile ID the ask Lambda uses; Bedrock reports its metrics under it. */
@@ -48,7 +48,7 @@ export class Monitoring extends Construct {
 
   constructor(scope: Construct, id: string, props: MonitoringProps) {
     super(scope, id);
-    const { api, searchFn, askFn, favouritesFn, ingestFn, domain } = props;
+    const { api, searchFn, askFn, bookmarksFn, ingestFn, domain } = props;
 
     this.topic = new Topic(this, 'AlarmTopic', { displayName: 'Collection search alarms' });
     // Resolved by CloudFormation at deploy time; the deploy fails if the parameter is missing,
@@ -106,7 +106,7 @@ export class Monitoring extends Construct {
     for (const [name, fn] of [
       ['SearchErrors', searchFn],
       ['AskErrors', askFn],
-      ['FavouritesErrors', favouritesFn],
+      ['BookmarksErrors', bookmarksFn],
       ['IngestErrors', ingestFn],
     ] as const) {
       alarm(

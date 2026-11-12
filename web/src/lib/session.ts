@@ -23,7 +23,7 @@ import { getConfig } from './config.js';
 
 export type User = NonNullable<App.Locals['user']>;
 
-const SCOPES = ['openid', 'email', `${RESOURCE_SERVER}/favourites`];
+const SCOPES = ['openid', 'email', `${RESOURCE_SERVER}/bookmarks`];
 
 const COOKIE = {
   login: 'cs_login', // PKCE verifier, state and return path, for the 10 minutes a sign-in takes

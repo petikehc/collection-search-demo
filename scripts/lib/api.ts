@@ -1,5 +1,5 @@
 /**
- * Calls the deployed API the way the web front end does: with the API key, and (for /favourites)
+ * Calls the deployed API the way the web front end does: with the API key, and (for /bookmarks)
  * a Cognito access token from signing in on the managed login page.
  *
  * Sign-in uses the public `cli` app client: this opens the browser at managed login, listens on

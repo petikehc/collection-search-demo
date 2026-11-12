@@ -1,16 +1,16 @@
 ---
 import Base from '../../layouts/Base.astro';
-import { listFavourites } from '../../lib/api.js';
+import { listBookmarks } from '../../lib/api.js';
 import { getObject } from '../../lib/museum.js';
 
 const id = Astro.params.id ?? '';
 if (!/^[0-9]{1,12}$/.test(id)) return new Response('Not found', { status: 404 });
 const { user } = Astro.locals;
 
-// The record and (if signed in) whether it's a favourite, fetched in parallel.
-const [objectResult, favouritesResult] = await Promise.allSettled([
+// The record and (if signed in) whether it's a bookmark, fetched in parallel.
+const [objectResult, bookmarksResult] = await Promise.allSettled([
   getObject(id),
-  user ? listFavourites(user.accessToken) : Promise.resolve([]),
+  user ? listBookmarks(user.accessToken) : Promise.resolve([]),
 ]);
 const object = objectResult.status === 'fulfilled' ? objectResult.value : null;
 const unavailable = objectResult.status === 'rejected';
@@ -18,9 +18,9 @@ if (unavailable) console.error('museum lookup failed', objectResult.reason);
 if (!object && !unavailable) Astro.response.status = 404;
 if (unavailable) Astro.response.status = 502;
 
-// If favourites can't be read, offer "Add": adding again is harmless.
-const isFavourite =
-  favouritesResult.status === 'fulfilled' && favouritesResult.value.some((f) => f.objectId === id);
+// If bookmarks can't be read, offer "Add": adding again is harmless.
+const isBookmark =
+  bookmarksResult.status === 'fulfilled' && bookmarksResult.value.some((f) => f.objectId === id);
 const facts = object
   ? ([
       ['Type', object.types.join(', ')],
@@ -54,26 +54,26 @@ const retrieved = object
         </p>
 
         {user ? (
-          isFavourite ? (
-            <form method="post" action="/favourites">
-              <span>In your <a href="/favourites">favourites</a>.</span>{' '}
+          isBookmark ? (
+            <form method="post" action="/bookmarks">
+              <span>In your <a href="/bookmarks">bookmarks</a>.</span>{' '}
               <input type="hidden" name="action" value="remove" />
               <input type="hidden" name="objectId" value={object.id} />
               <input type="hidden" name="returnTo" value={`/object/${object.id}`} />
               <button type="submit" class="secondary">Remove</button>
             </form>
           ) : (
-            <form method="post" action="/favourites">
+            <form method="post" action="/bookmarks">
               <input type="hidden" name="action" value="add" />
               <input type="hidden" name="objectId" value={object.id} />
               <input type="hidden" name="title" value={object.title.slice(0, 300)} />
               <input type="hidden" name="returnTo" value={`/object/${object.id}`} />
-              <button type="submit" class="secondary">Add to favourites</button>
+              <button type="submit" class="secondary">Bookmark</button>
             </form>
           )
         ) : (
           <p class="muted">
-            <a href={`/auth/login?returnTo=${encodeURIComponent(Astro.url.pathname)}`}>Sign in</a> to save favourites.
+            <a href={`/auth/login?returnTo=${encodeURIComponent(Astro.url.pathname)}`}>Sign in</a> to save bookmarks.
           </p>
         )}
 

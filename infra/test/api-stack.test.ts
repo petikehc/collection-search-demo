@@ -230,7 +230,7 @@ describe('ApiStack guardrail', () => {
   });
 });
 
-describe('ApiStack /favourites', () => {
+describe('ApiStack /bookmarks', () => {
   const app = new App({ context });
   const search = new SearchStack(app, 'Search', { env });
   const ai = new AiStack(app, 'Ai', { env, search });
@@ -241,14 +241,14 @@ describe('ApiStack /favourites', () => {
   const spec = Object.values(template.findResources('AWS::ApiGateway::RestApi'))[0]?.Properties
     .Body;
 
-  it('requires the favourites scope and the API key on every operation', () => {
+  it('requires the bookmarks scope and the API key on every operation', () => {
     const ops = [
-      spec.paths['/favourites'].get,
-      spec.paths['/favourites/{objectId}'].put,
-      spec.paths['/favourites/{objectId}'].delete,
+      spec.paths['/bookmarks'].get,
+      spec.paths['/bookmarks/{objectId}'].put,
+      spec.paths['/bookmarks/{objectId}'].delete,
     ];
     for (const op of ops) {
-      expect(op.security).toEqual([{ cognito: ['collection-search/favourites'], apiKey: [] }]);
+      expect(op.security).toEqual([{ cognito: ['collection-search/bookmarks'], apiKey: [] }]);
       expect(op['x-amazon-apigateway-integration']).toMatchObject({ type: 'aws_proxy' });
     }
   });
