@@ -34,6 +34,7 @@ The feature was also called "favourites". "Bookmarks" says what it does, and its
   - It never blocks a sign-up: Cognito fails the confirmation if a trigger throws, so a failed notification is logged instead. The new user's address isn't logged.
 - **An alarm on more than 20 sign-ups in a day,** to the same email. Each sign-up also sends a confirmation email to someone, so a burst suggests scripts.
 - **The rename, everywhere:** the API (`/bookmarks`), the Cognito scope (`bookmarks`), the DynamoDB table, the Lambda, the web pages, and the alarm. `/favourites` on the web site redirects permanently to `/bookmarks`.
+- **Bookmarking while signed out** (added with the redesign): the bookmark button is on every result and object for everyone. Signed out, its form POST starts sign-in (or sign-up), and the bookmark rides along in the 10-minute sign-in cookie, checked like the API checks it (digits for the ID, 1–300 characters of title). The callback saves it with the new token. Saving is best effort: the visitor is signed in either way and can press the button again. Changing data stays a POST, never a link, so no page or crawler can bookmark on someone's behalf.
 
 ## What it costs
 
