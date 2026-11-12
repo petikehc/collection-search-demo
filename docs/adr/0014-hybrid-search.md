@@ -69,6 +69,20 @@ Ask already retrieves by meaning, through the Knowledge Base (ADR 6), but only t
 
 Also checked live: "bommerang" returns boomerangs; "woomera" returns 37 results, 15 of them matching the word and ranked first; a filtered hybrid search; the paging limit; and that the search Lambda's read-only OpenSearch role is enough. Hybrid adds about 110 ms to a search.
 
+## Update: questions ranked by meaning (12 November 2026)
+
+The new results page showed a problem the eval had missed. For "What did people use to start fires?", the first five results were a bark painting, a saddle and a coin. They match enough of the question's common words ("what", "did", "people", "use", "start") to count as keyword matches, and with keyword-leaning weights every keyword match outranks every meaning-based one. The three right objects were 6th, 8th and 9th, so recall@10 still scored the question 100%.
+
+A second measure that counts order (the reciprocal rank of the first right object, MRR) showed the trade-off on the live index:
+
+| Weights (keyword/vector) | Question MRR | Question hit@3 | Keyword precision@10 |
+| ------------------------ | ------------ | -------------- | -------------------- |
+| 0.6/0.4                  | 0.76         | 75%            | 95%                  |
+| 0.2/0.8                  | 0.88         | 90%            | 89%                  |
+| 0.1/0.9                  | 0.92         | 90%            | 88%                  |
+
+No single weighting is best for both, so there are now two pipelines: `objects-hybrid` (0.6/0.4) for keyword-style searches, and `objects-hybrid-question` (0.2/0.8) for searches that look like questions, using the same question detection as the web site (a question mark, a question word first, or six words or more). 0.2/0.8 rather than 0.1/0.9 keeps some weight on exact words for questions that name something, given only 20 questions to judge by. `pnpm eval:search` now reports MRR and hit@3.
+
 ## Consequences
 
 - **Easier:** questions and misspellings find objects. The result list and the AI answer now draw on the same kind of retrieval.

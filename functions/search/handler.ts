@@ -5,13 +5,13 @@ import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { expandQuestion } from '../lib/ask/expand.js';
 import { createOpenSearchClient } from '../lib/opensearch/client.js';
-import { OBJECTS_ALIAS } from '../lib/search/constants.js';
 import { createEmbedder } from '../lib/search/embed.js';
 import {
   buildSearchBody,
   isHybrid,
   type OpenSearchSearchBody,
   parseSearchParams,
+  searchPath,
   toSearchResponse,
 } from '../lib/search/query.js';
 import { cached } from '../lib/search/query-vector.js';
@@ -46,7 +46,7 @@ export async function handler(event: APIGatewayProxyEvent): Promise<APIGatewayPr
     // valid aggregations (e.g. `terms.field`). The body is covered by unit tests and live runs.
     const res = await client.transport.request({
       method: 'POST',
-      path: `/${OBJECTS_ALIAS}/_search`,
+      path: searchPath(params),
       body: buildSearchBody(params, queryVector),
     });
     const body = toSearchResponse(res.body as OpenSearchSearchBody, params);
