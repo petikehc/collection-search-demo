@@ -31,6 +31,17 @@ export const onRequest = defineMiddleware(async (context, next) => {
         ? limits.pages
         : limits.posts;
     const verdict = limiter.hit(key);
+    if (!verdict.allowed && limiter === limits.answers) {
+      // Astro swaps an island's placeholder only for a 200 with HTML: anything else would
+      // leave "Writing an answer…" on screen for good. So the refusal is the island's content.
+      return new Response(
+        '<p class="message warn" role="status">Too many questions at once from your connection. Please wait a minute, then search again.</p>',
+        {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' },
+        },
+      );
+    }
     if (!verdict.allowed) {
       return new Response('Too many requests. Please slow down and try again in a minute.', {
         status: 429,

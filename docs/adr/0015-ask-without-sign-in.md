@@ -37,7 +37,7 @@ So removing sign-in needs another way to bound cost, one that holds whoever is a
   - the alarm on more than 60 answers in an hour.
 
   A new alarm fires when the allowance runs out.
-- **An answer only comes from a person's action.** The web page answers only when its form is submitted (a POST), never when a URL is loaded, so a crawler following links can't spend the allowance.
+- **An answer only comes from a person's action.** A question searched from one of the site's own pages answers itself; otherwise the visitor presses "Ask AI" (a form POST). Browsers mark navigations within a site with `Sec-Fetch-Site: same-origin` and `Sec-Fetch-Mode: navigate`, which crawlers and other tools don't send, so a crawler following links can't spend the allowance. (The first version used `Sec-Fetch-User`, which Safari doesn't send: questions never answered themselves there.)
 - **The web server refuses POSTs with no `Origin` header.** Astro's built-in origin check refuses cross-site POSTs, but let one with no `Origin` header through. Browsers always send `Origin` on a POST; scripts and crawlers often don't. A bot can fake the header, so this only stops naive ones: the allowance is the real bound.
 
 ## Cost

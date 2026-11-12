@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { looksLikeQuestion } from '../../functions/lib/search/question.js';
-import { isPersonsAction } from '../src/lib/question.js';
+import { isNavigationOnThisSite } from '../src/lib/question.js';
 
 describe('looksLikeQuestion', () => {
   it.each([
@@ -26,10 +26,19 @@ describe('looksLikeQuestion', () => {
   });
 });
 
-describe('isPersonsAction', () => {
-  it('is true only for navigations a user triggered', () => {
-    expect(isPersonsAction(new Headers({ 'sec-fetch-user': '?1' }))).toBe(true);
-    expect(isPersonsAction(new Headers())).toBe(false);
-    expect(isPersonsAction(new Headers({ 'sec-fetch-user': '?0' }))).toBe(false);
+describe('isNavigationOnThisSite', () => {
+  const nav = (site: string, mode = 'navigate') =>
+    new Headers({ 'sec-fetch-site': site, 'sec-fetch-mode': mode });
+
+  it('is true for a page reached from one of our own pages, in any current browser', () => {
+    // Safari sends no Sec-Fetch-User, so this mustn't depend on it.
+    expect(isNavigationOnThisSite(nav('same-origin'))).toBe(true);
+  });
+
+  it('is false for tools, links from other sites, typed addresses and scripts', () => {
+    expect(isNavigationOnThisSite(new Headers())).toBe(false);
+    expect(isNavigationOnThisSite(nav('cross-site'))).toBe(false);
+    expect(isNavigationOnThisSite(nav('none'))).toBe(false);
+    expect(isNavigationOnThisSite(nav('same-origin', 'cors'))).toBe(false);
   });
 });
