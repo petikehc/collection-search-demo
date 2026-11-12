@@ -39,7 +39,7 @@ describe('Monitoring', () => {
 
   it('alarms on errors, slow or unusual Ask use, and OpenSearch health, all to the topic', () => {
     const alarms = Object.values(api.findResources('AWS::CloudWatch::Alarm'));
-    expect(alarms).toHaveLength(11);
+    expect(alarms).toHaveLength(12);
     for (const a of alarms) expect(a.Properties.AlarmActions).toHaveLength(1);
   });
 

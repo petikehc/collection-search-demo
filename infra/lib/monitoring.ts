@@ -129,6 +129,12 @@ export class Monitoring extends Construct {
       'Unusually many Ask requests in an hour: each one costs money, and budgets alert hours later',
     );
     alarm(
+      'AskCapReached',
+      custom('AskCapReached', 'ask', Duration.hours(1)),
+      1,
+      "Today's allowance of AI answers is used up: visitors are being turned away until tomorrow",
+    );
+    alarm(
       'GuardrailInterventions',
       custom('GuardrailInterventions', 'ask', Duration.hours(1)),
       10,

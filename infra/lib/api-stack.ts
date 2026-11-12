@@ -29,6 +29,8 @@ import { embeddingModelArn, type SearchStack } from './search-stack.js';
 export const STAGE = 'v1';
 
 /** Haiku 4.5 through the Australian cross-region inference profile: Sydney and Melbourne only. */
+/** Answers a day, for everyone together: Ask needs no sign-in, so this bounds what it can cost. */
+export const ASK_DAILY_CAP = 500;
 export const ASK_PROFILE_ID = 'au.anthropic.claude-haiku-4-5-20251001-v1:0';
 const ASK_FOUNDATION_MODEL = 'anthropic.claude-haiku-4-5-20251001-v1:0';
 const ASK_PROFILE_REGIONS = ['ap-southeast-2', 'ap-southeast-4'];
@@ -100,12 +102,20 @@ export class ApiStack extends Stack {
       },
     });
 
-    // POST /ask: RetrieveAndGenerate with the guardrail. Every call costs money, so reserved
+    // POST /ask: RetrieveAndGenerate with the guardrail. No sign-in: the API key (held by the
+    // web server) and a daily allowance stand between a visitor and the model. Every call costs
+    // money, so reserved
     // concurrency is a hard ceiling on parallel model calls (API Gateway throttles are best effort).
     const askProfileArn = this.formatArn({
       service: 'bedrock',
       resource: 'inference-profile',
       resourceName: ASK_PROFILE_ID,
+    });
+    // The daily allowance of answers: one item per day, deleted by TTL after a week.
+    const askBudget = new TableV2(this, 'AskBudget', {
+      partitionKey: { name: 'day', type: AttributeType.STRING },
+      timeToLiveAttribute: 'expiresAt',
+      removalPolicy: RemovalPolicy.DESTROY,
     });
     const askFn = new NodejsFunction(this, 'AskFunction', {
       description: 'POST /ask: RAG over the collection with the guardrail applied',
@@ -120,12 +130,16 @@ export class ApiStack extends Stack {
         ...LAMBDA_DEFAULTS.environment,
         KNOWLEDGE_BASE_ID: knowledgeBase.attrKnowledgeBaseId,
         MODEL_ARN: askProfileArn,
+        BUDGET_TABLE: askBudget.tableName,
+        DAILY_CAP: String(ASK_DAILY_CAP),
         GUARDRAIL_ID: guardrail.guardrailId,
         GUARDRAIL_VERSION: guardrail.version,
         POWERTOOLS_SERVICE_NAME: 'ask',
         POWERTOOLS_METRICS_NAMESPACE: 'CollectionSearch',
       },
     });
+    // Count against the allowance, nothing else: it can't read or delete the counter.
+    askBudget.grant(askFn, 'dynamodb:UpdateItem');
     // RetrieveAndGenerate has no resource type; the calls it makes are each scoped below.
     askFn.addToRolePolicy(
       new PolicyStatement({ actions: ['bedrock:RetrieveAndGenerate'], resources: ['*'] }),

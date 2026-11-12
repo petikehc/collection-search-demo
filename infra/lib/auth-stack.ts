@@ -31,7 +31,7 @@ import {
 } from '../../functions/lib/auth/constants.js';
 
 /**
- * Cognito user pool for signing in to Ask and favourites. Users sign in on Cognito's managed
+ * Cognito user pool for signing in to favourites (Ask needs no sign-in). Users sign in on Cognito's managed
  * login pages (authorisation code grant with PKCE); there's no sign-up page: an admin creates
  * each user with `pnpm user:create`. API Gateway checks the access token's scopes.
  */
@@ -66,10 +66,6 @@ export class AuthStack extends Stack {
       managedLoginVersion: ManagedLoginVersion.NEWER_MANAGED_LOGIN,
     });
 
-    const ask = new ResourceServerScope({
-      scopeName: SCOPES.ask,
-      scopeDescription: 'Ask questions about the collection',
-    });
     const favourites = new ResourceServerScope({
       scopeName: SCOPES.favourites,
       scopeDescription: 'Read and change your favourites',
@@ -77,12 +73,11 @@ export class AuthStack extends Stack {
     const api = this.userPool.addResourceServer('Api', {
       identifier: RESOURCE_SERVER,
       userPoolResourceServerName: 'Collection search API',
-      scopes: [ask, favourites],
+      scopes: [favourites],
     });
     const scopes = [
       OAuthScope.OPENID,
       OAuthScope.EMAIL,
-      OAuthScope.resourceServer(api, ask),
       OAuthScope.resourceServer(api, favourites),
     ];
 

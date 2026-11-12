@@ -12,7 +12,7 @@ It indexes a sample of the National Museum of Australia's public collection (abo
 
 - **Search** (`/`): hybrid search. Keyword matches (with synonyms, so `woomera` finds spear-throwers, stemming and highlighting) are ranked together with the objects nearest in meaning, so a question or a misspelling still finds related objects. Facets for type, place and decade. Results come from our own OpenSearch index.
 - **Object pages** (`/object/<id>`): read live from the Museum's Collection API, with images hotlinked from the Museum, their rights statements, and a link back to the record.
-- **Ask the collection** (`/ask`, sign-in required): Claude Haiku 4.5 answers from the six most relevant records and cites each one. It says so when the collection doesn't cover a question. A Guardrail blocks valuation requests, prompt attacks and harmful content, masks personal details, and checks answers are grounded in the records. Requests for secret or sacred cultural knowledge are detected and counted for review rather than blocked, because blocking them refused everyday questions about Aboriginal objects ([ADR 7](docs/adr/0007-guardrail-for-ask.md)).
+- **Ask the collection** (`/ask`, no sign-in, up to 500 answers a day for everyone together): Claude Haiku 4.5 answers from the six most relevant records and cites each one. It says so when the collection doesn't cover a question. A Guardrail blocks valuation requests, prompt attacks and harmful content, masks personal details, and checks answers are grounded in the records. Requests for secret or sacred cultural knowledge are detected and counted for review rather than blocked, because blocking them refused everyday questions about Aboriginal objects ([ADR 7](docs/adr/0007-guardrail-for-ask.md)).
 - **Favourites** (`/favourites`, sign-in required): save objects per user.
 
 ## Architecture
@@ -134,8 +134,8 @@ USD in Sydney, from AWS list prices. These are estimates, not a bill.
 | ------------------------------------------ | ----------------------------------------- |
 | OpenSearch: 1 × `m7g.medium.search`, 10 GB | **about $2.09 a day (about $63 a month)** |
 | Bedrock embeddings, one full KB sync       | about $0.03                               |
-| Ask: one question (Haiku 4.5 + Guardrail)  | a fraction of a cent                      |
-| Two secrets, 13 alarms                     | about $2.10 a month                       |
+| Ask: one question (Haiku 4.5 + Guardrail)  | a fraction of a cent (at most 500 a day)  |
+| Two secrets, 14 alarms                     | about $2.20 a month                       |
 | Cognito Essentials                         | free tier (10,000 monthly active users)   |
 | API Gateway, Lambda, DynamoDB, S3, logs    | cents at demo traffic                     |
 | Site certificate and custom domain         | free                                      |
@@ -160,6 +160,7 @@ Each significant choice has an architecture decision record, with the options co
 12. [Data residency: everything in Sydney, generation within Australia, enforced by IAM](docs/adr/0012-data-residency.md)
 13. [Hosting the web front end: Lambda behind an HTTP API on a custom domain](docs/adr/0013-hosting-the-web-front-end.md)
 14. [Hybrid search: keyword and vector matches ranked together, with L2 normalisation](docs/adr/0014-hybrid-search.md)
+15. [Ask without sign-in, bounded by a daily allowance of answers](docs/adr/0015-ask-without-sign-in.md)
 
 ## Evaluation
 

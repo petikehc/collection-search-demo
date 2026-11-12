@@ -1,6 +1,6 @@
 /** Cognito resource server identifier: access tokens carry scopes as `collection-search/<scope>`. */
 export const RESOURCE_SERVER = 'collection-search';
-export const SCOPES = { ask: 'ask', favourites: 'favourites' } as const;
+export const SCOPES = { favourites: 'favourites' } as const;
 
 /** Where the web front end is hosted (docs/adr/0013-hosting-the-web-front-end.md). */
 export const WEB_DOMAIN = 'collection-search.idoescode.com';

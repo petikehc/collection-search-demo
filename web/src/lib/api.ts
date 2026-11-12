@@ -27,8 +27,9 @@ export async function search(params: SearchParams): Promise<SearchResponse> {
   return call<SearchResponse>('GET', `search?${query}`);
 }
 
-export function ask(accessToken: string, question: string): Promise<AskResponse> {
-  return call<AskResponse>('POST', 'ask', { accessToken, body: { question } });
+/** No sign-in: the API key alone, with a daily allowance of answers behind it. */
+export function ask(question: string): Promise<AskResponse> {
+  return call<AskResponse>('POST', 'ask', { body: { question } });
 }
 
 export async function listFavourites(accessToken: string): Promise<Favourite[]> {

@@ -1,7 +1,7 @@
 /**
  * Calls any API operation and prints the status and body: handy for checking auth.
  *
- *   pnpm call GET /favourites                               (token with both scopes + API key)
+ *   pnpm call GET /favourites                               (token with the favourites scope + API key)
  *   pnpm call PUT /favourites/27954 '{"title":"Method of lighting fire"}'
  *   pnpm call GET /favourites --scopes openid               (valid token, wrong scope)
  *   pnpm call GET /favourites --no-token                    (no token)
@@ -23,7 +23,7 @@ if (!method || !path) throw new Error('Usage: pnpm call <METHOD> <path> [json bo
 
 const scopes = values['no-token']
   ? undefined
-  : (values.scopes?.split(',') ?? ['openid', scope('ask'), scope('favourites')]);
+  : (values.scopes?.split(',') ?? ['openid', scope('favourites')]);
 
 const res = await callApi(method.toUpperCase(), path, {
   body: body === undefined ? undefined : JSON.parse(body),

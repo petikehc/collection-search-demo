@@ -33,10 +33,12 @@ paths:
       description: |
         Retrieves relevant collection records from the Bedrock Knowledge Base and has a model
         answer from them only, with citations. A Bedrock Guardrail checks the question and the
-        answer. Needs a signed-in user's access token with the `ask` scope, and the API key.
+        answer.
+
+        Needs the API key only, which the web server holds: there is no sign-in. Cost is bounded
+        by a daily allowance of answers shared by all callers, on top of the throttle.
       security:
-        - cognito: [collection-search/ask]
-          apiKey: []
+        - apiKey: []
       requestBody:
         required: true
         content:
@@ -52,12 +54,14 @@ paths:
                 $ref: "#/components/schemas/AskResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
         "403":
-          $ref: "#/components/responses/Forbidden"
+          description: Missing or invalid API key
         "429":
-          description: Throttled
+          description: Throttled, or today's allowance of answers is used up
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
 
   /favourites:
     get:
