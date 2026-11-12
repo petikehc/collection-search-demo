@@ -49,7 +49,7 @@ export function bulkBody(index: string, docs: SearchDocument[]): object[] {
 
 /**
  * Zero-downtime full reindex:
- * create a new versioned index → bulk load → refresh and verify the count → swap the alias
+ * create a new versioned index → bulk load → merge to one segment → verify the count → swap the alias
  * atomically → prune old indices (keeping one previous index for rollback).
  */
 export async function reindex(
@@ -75,6 +75,10 @@ export async function reindex(
         );
       }
     }
+    // One segment: the index is never written to again, and k-NN returns its k nearest
+    // neighbours *per segment*, so with eight segments a hybrid search got 240 neighbours
+    // where 30 were asked for, which changed the ranking the weights were tuned on.
+    await client.indices.forcemerge({ index, max_num_segments: 1 });
     await client.indices.refresh({ index });
     const count = Number((await client.count({ index })).body.count);
     if (count !== docs.length) {

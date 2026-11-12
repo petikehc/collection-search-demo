@@ -32,6 +32,7 @@ function fakeClient(opts: { aliasOn?: string[]; fail?: string } = {}) {
     count: call('count', { count: 1 }),
     indices: {
       create: call('create', {}),
+      forcemerge: call('forcemerge', {}),
       refresh: call('refresh', {}),
       existsAlias: call('existsAlias', aliasOn.length > 0),
       getAlias: call('getAlias', Object.fromEntries(aliasOn.map((i) => [i, {}]))),
@@ -53,6 +54,18 @@ describe('reindex', () => {
         name: 'objects',
       });
     }
+  });
+
+  it('merges the new index to one segment before it goes live (k-NN is per segment)', async () => {
+    const { client, calls } = fakeClient();
+    await reindex(client, [doc], { now: NOW });
+    const order = calls.map((c) => c.method);
+    expect(order.indexOf('forcemerge')).toBeGreaterThan(order.indexOf('bulk'));
+    expect(order.indexOf('forcemerge')).toBeLessThan(order.indexOf('updateAliases'));
+    expect(calls.find((c) => c.method === 'forcemerge')?.params).toEqual({
+      index: NEW_INDEX,
+      max_num_segments: 1,
+    });
   });
 
   it('deletes the new index if the alias swap fails, so nothing is orphaned', async () => {
