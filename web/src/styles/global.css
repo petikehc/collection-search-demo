@@ -112,6 +112,13 @@ textarea {
   flex: none;
 }
 
+.external-icon {
+  width: 0.85em;
+  height: 0.85em;
+  margin-inline-start: 0.2em;
+  vertical-align: -0.05em;
+}
+
 .container {
   width: 100%;
   max-width: var(--wide);
