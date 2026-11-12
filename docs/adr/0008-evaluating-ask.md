@@ -48,15 +48,18 @@ At temperature 0.2, the same question produced grounding scores from 0.23 to 0.8
 
 ## Results
 
-| Run         | Change                                         | Expectations met | Recall@6 | Faithfulness | Helpfulness |
-| ----------- | ---------------------------------------------- | ---------------- | -------- | ------------ | ----------- |
-| baseline    | evaluator fixed                                | 88%              | 88%      | 4.89         | 4.32        |
-| calibrated  | grounding/relevance 0.7/0.5 → 0.5/0.2          | 100%*            | 88%      | 4.91         | 4.41        |
-| expanded-v2 | query expansion as search terms; temperature 0 | 96%              | 93%      | 4.81         | 4.33        |
+| Run              | Change                                                                                      | Expectations met | Recall@6 | Faithfulness | Helpfulness |
+| ---------------- | ------------------------------------------------------------------------------------------- | ---------------- | -------- | ------------ | ----------- |
+| baseline         | evaluator fixed                                                                             | 88%              | 88%      | 4.89         | 4.32        |
+| calibrated       | grounding/relevance 0.7/0.5 → 0.5/0.2                                                       | 100%*            | 88%      | 4.91         | 4.41        |
+| expanded-v2      | query expansion as search terms; temperature 0                                              | 96%              | 93%      | 4.81         | 4.33        |
+| examples-not-all | "which objects" answers framed as examples (12 Nov; new sample, so recall isn't comparable) | 96%              | 74%      | 4.77         | 4.50        |
 
 \* At temperature 0.2 the QSL case happened to pass in that run; with temperature 0 its result is stable (see below).
 
 Details per case are in `evals/results/`.
+
+**examples-not-all:** "Churches in Victoria?" got "The collection includes postcards of two churches in Victoria", though the model only sees the six closest records. The prompt now asks for "which objects" answers to be framed as examples from the records found. The first wording also told the model to say the results list may show more. The Guardrail blocked four more answers (80% met), because that sentence isn't in any record and so fails the grounding check. The pointer to the results list is now fixed text under the answer, outside the model's output. Keep the model's answer to what the records say; put everything else in the page.
 
 ## Consequences
 
