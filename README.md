@@ -6,7 +6,8 @@ It indexes a sample of the National Museum of Australia's public collection (abo
 
 **Live:** https://collection-search.idoescode.com, while the stacks are deployed. They're torn down between demos to save cost, and rebuilt from code.
 
-> **Screen recording:** _to be added._
+**Walkthrough** (1 minute; the Museum's images are blurred in the video, as its terms allow them only beside their record):
+
 
 ## What it does
 
@@ -27,7 +28,7 @@ flowchart LR
   web -- "API key + access token" --> apigw[API Gateway REST<br/>from openapi.yaml]
 
   apigw -- "GET /search" --> search[search λ]
-  apigw -- "POST /ask<br/>scope: ask" --> ask[ask λ]
+  apigw -- "POST /ask<br/>API key only, 500 a day" --> ask[ask λ]
   apigw -- "/bookmarks<br/>scope: bookmarks" --> fav[bookmarks λ]
 
   search --> os[(OpenSearch domain<br/>alias objects → objects-ts)]
