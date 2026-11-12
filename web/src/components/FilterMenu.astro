@@ -1,0 +1,34 @@
+---
+import Icon from './Icon.astro';
+
+/**
+ * A filter as a dropdown (a native <details>, so it works without JavaScript). Each option is a
+ * link to the search with that filter applied. Links are nofollow: crawlers shouldn't walk
+ * every combination of filters.
+ */
+interface Props {
+  label: string;
+  options: { label: string; count?: number; href: string }[];
+  /** Shown when there's nothing to choose. */
+  empty?: string;
+}
+const { label, options, empty = 'Nothing to filter by here.' } = Astro.props;
+---
+
+<details class="filter-menu">
+  <summary>
+    <span>{label}</span>
+    <Icon name="chevron-down" />
+  </summary>
+  <div class="filter-options">
+    {options.length === 0 && <p class="muted small">{empty}</p>}
+    {
+      options.map((o) => (
+        <a href={o.href} rel="nofollow">
+          <span>{o.label}</span>
+          {o.count !== undefined && <span class="muted">{o.count.toLocaleString('en-AU')}</span>}
+        </a>
+      ))
+    }
+  </div>
+</details>
