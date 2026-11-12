@@ -7,6 +7,8 @@ import { WEB_DOMAIN } from '../functions/lib/auth/constants.js';
 // client secret and tokens stay on the server, and the browser gets plain HTML (no client-side
 // JavaScript framework).
 export default defineConfig({
+  // The public address: absolute URLs in share cards and canonical links use it.
+  site: `https://${WEB_DOMAIN}`,
   output: 'server',
   adapter: node({ mode: 'standalone' }),
   server: { port: 4321, host: 'localhost' },
