@@ -1,0 +1,12 @@
+# Collection Search Demo: a learning project. Only the home page is for indexing.
+# Search results, object pages (each one calls the Museum's API live), sign-in and bookmarks
+# are not.
+User-agent: *
+Disallow: /search
+Disallow: /object/
+Disallow: /auth/
+Disallow: /bookmarks
+Disallow: /favourites
+Disallow: /ask
+Disallow: /notice
+Disallow: /_server-islands/

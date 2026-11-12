@@ -43,15 +43,16 @@ flowchart LR
 
 Everything runs in `ap-southeast-2` (Sydney). Generation uses the `au.` cross-region inference profile, which stays within Sydney and Melbourne. Embeddings use Titan Text Embeddings V2 in Sydney.
 
-| Stack                     | What it holds                                                                                                |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `CollectionSearch-Search` | OpenSearch domain (fine-grained access control), its bootstrap, ingest Lambda and schedule, documents bucket |
-| `CollectionSearch-Ai`     | Knowledge Base and data source, Guardrail, Bedrock invocation logging                                        |
-| `CollectionSearch-Auth`   | Cognito user pool with self sign-up, managed login, `bookmarks` scope, web and CLI clients, sign-up emails   |
-| `CollectionSearch-Api`    | API Gateway (usage plan, API key, throttling, Cognito authoriser), Lambdas, DynamoDB, alarms, dashboard      |
-| `CollectionSearch-Web`    | The Astro server in Lambda (Lambda Web Adapter), behind an HTTP API on the custom domain                     |
-| `CollectionSearch-Domain` | The site's certificate and custom domain name (kept by teardown, so the DNS records stay valid)              |
-| `CollectionSearch-Ci`     | GitHub OIDC provider and the deploy role (deployed by hand, kept by teardown)                                |
+| Stack                     | What it holds                                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `CollectionSearch-Search` | OpenSearch domain (fine-grained access control), its bootstrap, ingest Lambda and schedule, documents bucket     |
+| `CollectionSearch-Ai`     | Knowledge Base and data source, Guardrail, Bedrock invocation logging                                            |
+| `CollectionSearch-Auth`   | Cognito user pool with self sign-up, managed login, `bookmarks` scope, web and CLI clients, sign-up emails       |
+| `CollectionSearch-Api`    | API Gateway (usage plan, API key, throttling, Cognito authoriser), Lambdas, DynamoDB, alarms, dashboard          |
+| `CollectionSearch-Web`    | The Astro server in Lambda (Lambda Web Adapter), behind an HTTP API on the custom domain                         |
+| `CollectionSearch-Domain` | The site's certificate and custom domain name (kept by teardown, so the DNS records stay valid)                  |
+| `CollectionSearch-Ci`     | GitHub OIDC provider and the deploy role (deployed by hand, kept by teardown)                                    |
+| `CollectionSearch-Costs`  | AWS Cost Anomaly Detection: a daily email if account spend jumps (kept by teardown, so it keeps what it learned) |
 
 ## What's real and what isn't
 
@@ -125,7 +126,7 @@ pnpm teardown --dry-run   # what would be deleted
 pnpm teardown             # asks you to type the project name
 ```
 
-This deletes every stack except `Ci` and `Domain`, which are free to keep. It then removes leftover log groups and switches off Bedrock invocation logging if this project switched it on. It finishes with `pnpm status`, which should show nothing billed by the hour.
+This deletes every stack except `Ci`, `Domain` and `Costs`, which are free to keep. It then removes leftover log groups and switches off Bedrock invocation logging if this project switched it on. It finishes with `pnpm status`, which should show nothing billed by the hour.
 
 ## Cost
 
@@ -136,7 +137,7 @@ USD in Sydney, from AWS list prices. These are estimates, not a bill.
 | OpenSearch: 1 × `m7g.medium.search`, 10 GB | **about $2.09 a day (about $63 a month)** |
 | Bedrock embeddings, one full KB sync       | about $0.03                               |
 | Ask: one question (Haiku 4.5 + Guardrail)  | a fraction of a cent (at most 500 a day)  |
-| Two secrets, 15 alarms                     | about $2.30 a month                       |
+| Two secrets, 16 alarms                     | about $2.40 a month                       |
 | Cognito Essentials                         | free tier (10,000 monthly active users)   |
 | API Gateway, Lambda, DynamoDB, S3, logs    | cents at demo traffic                     |
 | Site certificate and custom domain         | free                                      |

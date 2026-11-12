@@ -36,10 +36,11 @@ import { REGION } from './stack-outputs.js';
 
 export const STACK_PREFIX = 'CollectionSearch-';
 /**
- * Kept by teardown, both free: the GitHub Actions OIDC role is set up once and reused, and the
- * web domain's certificate and domain name keep the hand-made DNS records valid.
+ * Kept by teardown, all free: the GitHub Actions OIDC role is set up once and reused, the web
+ * domain's certificate and domain name keep the hand-made DNS records valid, and cost anomaly
+ * detection keeps the spending history it has learned.
  */
-export const KEEP_STACKS = [`${STACK_PREFIX}Ci`, `${STACK_PREFIX}Domain`];
+export const KEEP_STACKS = [`${STACK_PREFIX}Ci`, `${STACK_PREFIX}Domain`, `${STACK_PREFIX}Costs`];
 export const PROJECT_TAG = { key: 'project', value: 'collection-search-demo' };
 /** The domain we deliberately keep running between sessions. */
 export const EXPECTED_DOMAIN = 'collection-search';

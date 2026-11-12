@@ -61,12 +61,15 @@ describe('WebStack', () => {
     const [stage] = Object.values(template.findResources('AWS::ApiGatewayV2::Stage'));
     const format = stage?.Properties.AccessLogSettings.Format;
     expect(format).toContain('$context.path');
+    expect(format).toContain('$context.identity.userAgent');
     expect(format).not.toMatch(/querystring|routeKey/i);
   });
 
-  it('alarms on Lambda errors and server errors, to the app alarm topic', () => {
+  it('alarms on Lambda errors, server errors and heavy traffic, to the app alarm topic', () => {
     const alarms = Object.values(template.findResources('AWS::CloudWatch::Alarm'));
-    expect(alarms.map((a) => a.Properties.MetricName).sort()).toEqual(['5xx', 'Errors']);
+    expect(alarms.map((a) => a.Properties.MetricName).sort()).toEqual(['5xx', 'Count', 'Errors']);
+    const traffic = alarms.find((a) => a.Properties.MetricName === 'Count');
+    expect(traffic?.Properties).toMatchObject({ Period: 3600, Threshold: 20_000 });
     for (const a of alarms) expect(a.Properties.AlarmActions).toHaveLength(1);
   });
 });
