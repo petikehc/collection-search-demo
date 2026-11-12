@@ -166,7 +166,10 @@ export function buildSearchBody(params: SearchParams, queryVector?: number[]) {
           multi_match: {
             query: params.q,
             fields: SEARCH_FIELDS,
-            type: 'best_fields',
+            // The words may sit in different fields ("church" in the title, "Victoria" in the
+            // place): cross_fields matches them as one field. best_fields needed every word in
+            // one field, and missed those objects.
+            type: 'cross_fields',
             tie_breaker: 0.3,
             minimum_should_match: '2<75%',
             // A query of only stop words ("the", "a") has no terms left after analysis:
