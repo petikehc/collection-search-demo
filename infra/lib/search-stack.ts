@@ -124,7 +124,7 @@ export class SearchStack extends Stack {
     // Hybrid search: each half of a hybrid query scores on its own scale (BM25 is unbounded,
     // vector similarity isn't), so the pipeline puts both on one scale and takes a weighted
     // mean. L2 with these weights kept exact keyword matches on top where min-max didn't
-    // (docs/adr/0014-one-box-and-hybrid-search.md). The objects index names this pipeline as
+    // (docs/adr/0014-hybrid-search.md). The objects index names this pipeline as
     // its default, so it must exist before the first ingest.
     new OpenSearchSearchPipeline(this, 'HybridPipeline', {
       provider: this.openSearchRoles,

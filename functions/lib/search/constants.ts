@@ -2,7 +2,7 @@
 export const OBJECTS_ALIAS = 'objects';
 
 /**
- * Hybrid search (docs/adr/0014-one-box-and-hybrid-search.md): the search pipeline that combines
+ * Hybrid search (docs/adr/0014-hybrid-search.md): the search pipeline that combines
  * keyword and vector scores, set as the objects index's default pipeline.
  */
 export const HYBRID_PIPELINE = 'objects-hybrid';

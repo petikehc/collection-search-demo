@@ -23,6 +23,13 @@
 
 Results are written to `results/<date>-<label>.md` and `.json`, so each change can be compared with the last run.
 
+## Search
+
+`pnpm eval:search` compares keyword and hybrid search through the deployed `GET /search`, and writes `results/<date>-search-<label>.md`. It measures both directions hybrid search can fail in:
+
+- **Questions** (the answerable cases above): recall@10 and hit@10 of each case's `expectedObjectIds`. Keyword search is weak here.
+- **Keywords** (`search-keywords.json`): of the first 10 hybrid results, the share that contain the words at all. Keyword search scores 100% by definition, and hybrid must not give that up by ranking look-alikes above exact matches.
+
 ## Evaluating the evaluator
 
 The first baseline run scored two faithful answers 2/5. The judge had been given passages cut at 1,500 characters, and called details from later in those records "invented". The judge now sees each passage in full. Broad topics also scored 0% recall while retrieving relevant objects, because only four "expected" IDs were listed, so broad topics now list every relevant object. Check surprising scores against the evidence before changing the system.
