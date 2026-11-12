@@ -36,6 +36,16 @@
           }
         }
       }
+    },
+    {
+      "includes": ["web/design/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useGenericFontNames": "off"
+          }
+        }
+      }
     }
   ]
 }

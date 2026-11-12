@@ -5,14 +5,26 @@ import '../styles/global.css';
 import Icon from '../components/Icon.astro';
 import { APP_NAME, CULTURAL_NOTICE, NOTICE_COOKIE } from '../lib/notice.js';
 
+/** Shown in search results and share cards when a page doesn't give its own. */
+const DEFAULT_DESCRIPTION =
+  "Search the National Museum of Australia's public collection, or ask a question and get an answer drawn only from its records, with citations. An independent learning project.";
+
 interface Props {
   title: string;
+  /** One or two sentences about this page, for search results and share cards. */
+  description?: string;
   /** Keep this page out of search engines (results, sign-in, personal pages). */
   noindex?: boolean;
   /** `narrow` for single-column pages; results use the full width. */
   width?: 'wide' | 'narrow';
 }
-const { title, noindex = false, width = 'wide' } = Astro.props;
+const { title, description = DEFAULT_DESCRIPTION, noindex = false, width = 'wide' } = Astro.props;
+const fullTitle = `${title} · ${APP_NAME}`;
+const site = Astro.site ?? Astro.url;
+const pageUrl = new URL(Astro.url.pathname + Astro.url.search, site).href;
+// One share image for every page. Not the Museum's images: platforms copy and cache shared
+// images, and the Museum's terms allow its images only hotlinked, alongside the record.
+const shareImage = new URL('/og.png', site).href;
 const { user } = Astro.locals;
 const here = Astro.url.pathname + Astro.url.search;
 const showNotice = Astro.cookies.get(NOTICE_COOKIE)?.value !== 'dismissed';
@@ -25,8 +37,28 @@ const container = width === 'narrow' ? 'container narrow' : 'container';
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#0f3a40" />
-    {noindex && <meta name="robots" content="noindex, nofollow" />}
-    <title>{title} · {APP_NAME}</title>
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    {noindex ? <meta name="robots" content="noindex, nofollow" /> : <link rel="canonical" href={pageUrl} />}
+
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={APP_NAME} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={pageUrl} />
+    <meta property="og:locale" content="en_AU" />
+    <meta property="og:image" content={shareImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Collection Search: search the National Museum of Australia's collection, or just ask."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     {

@@ -25,11 +25,24 @@ if (!object && !unavailable) Astro.response.status = 404;
 if (unavailable) Astro.response.status = 502;
 
 // If bookmarks can't be read, offer "Bookmark": adding again is harmless.
+// For search results and share cards: what the object is, in the Museum's words.
+const description = object
+  ? (
+      [object.physicalDescription, object.contentDescription, object.description].find(Boolean) ??
+      `${object.title}, from the National Museum of Australia's collection.`
+    )
+      .replace(/\s+/g, ' ')
+      .slice(0, 200)
+  : undefined;
 const bookmarked =
   bookmarksResult.status === 'fulfilled' && bookmarksResult.value.some((b) => b.objectId === id);
 ---
 
-<Base title={object?.title ?? 'Object not found'} width="narrow">
+<Base
+  title={object?.title ?? 'Object not found'}
+  description={description}
+  width="narrow"
+>
   <div class="container narrow page">
     {
       backTo && backTo !== '/' && (

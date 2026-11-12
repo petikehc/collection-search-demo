@@ -10,3 +10,12 @@ Disallow: /favourites
 Disallow: /ask
 Disallow: /notice
 Disallow: /_server-islands/
+
+# Link previews: these fetch only the one page someone shared, to read its title, description
+# and image. Blocking them would leave a shared object's link with no preview.
+User-agent: facebookexternalhit
+User-agent: LinkedInBot
+User-agent: Twitterbot
+User-agent: Slackbot-LinkExpanding
+User-agent: Discordbot
+Allow: /
