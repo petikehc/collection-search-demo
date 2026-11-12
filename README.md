@@ -2,7 +2,7 @@
 
 A learning project: hands-on with Amazon Bedrock, Amazon OpenSearch Service and Amazon Cognito, using a public museum collection.
 
-It indexes a sample of the National Museum of Australia's public collection (about 3,750 objects) for keyword search with facets. It also offers **Ask the collection**: questions answered from the collection records with retrieval-augmented generation, through a Bedrock Knowledge Base and a Guardrail, with a citation for every claim.
+It indexes a sample of the National Museum of Australia's public collection (about 3,900 objects) for hybrid keyword and vector search. One box takes keywords or a question: a question also gets an answer drawn only from the collection's records, through a Bedrock Knowledge Base and a Guardrail, with a citation for every claim.
 
 **Live:** https://collection-search.idoescode.com, while the stacks are deployed. They're torn down between demos to save cost, and rebuilt from code.
 
@@ -10,10 +10,11 @@ It indexes a sample of the National Museum of Australia's public collection (abo
 
 ## What it does
 
-- **Search** (`/`): hybrid search. Keyword matches (with synonyms, so `woomera` finds spear-throwers, stemming and highlighting) are ranked together with the objects nearest in meaning, so a question or a misspelling still finds related objects. Facets for type, place and decade. Results come from our own OpenSearch index.
+- **One box** (`/`, then `/search`): keywords or a question, with filters for type, place, decade and "with images only", and a few objects with images to start from. Results are listed on the left, with the selected object (or the AI answer) on the right; on a phone, the list comes first and an object opens on its own.
+- **Search:** hybrid search. Keyword matches (with synonyms, so `woomera` finds spear-throwers, stemming and highlighting) are ranked together with the objects nearest in meaning, so a question or a misspelling still finds related objects. Facets for type, place and decade. Results come from our own OpenSearch index.
 - **Object pages** (`/object/<id>`): read live from the Museum's Collection API, with images hotlinked from the Museum, their rights statements, and a link back to the record.
-- **Ask the collection** (`/ask`, no sign-in, up to 500 answers a day for everyone together): Claude Haiku 4.5 answers from the six most relevant records and cites each one. It says so when the collection doesn't cover a question. A Guardrail blocks valuation requests, prompt attacks and harmful content, masks personal details, and checks answers are grounded in the records. Requests for secret or sacred cultural knowledge are detected and counted for review rather than blocked, because blocking them refused everyday questions about Aboriginal objects ([ADR 7](docs/adr/0007-guardrail-for-ask.md)).
-- **Bookmarks** (`/bookmarks`, sign-in required): save objects per user. Anyone can sign up with an email address and a password, confirmed with an emailed code ([ADR 16](docs/adr/0016-bookmarks-and-self-sign-up.md)).
+- **AI answers** (no sign-in, up to 500 a day for everyone together): a question searched from the site answers itself in the results pane; keyword searches offer "Ask AI" instead (ADR 15). Claude Haiku 4.5 answers from the six most relevant records and cites each one. It says so when the collection doesn't cover a question. A Guardrail blocks valuation requests, prompt attacks and harmful content, masks personal details, and checks answers are grounded in the records. Requests for secret or sacred cultural knowledge are detected and counted for review rather than blocked, because blocking them refused everyday questions about Aboriginal objects ([ADR 7](docs/adr/0007-guardrail-for-ask.md)).
+- **Bookmarks** (`/bookmarks`, sign-in required): the bookmark icon is on every result and object. Signed out, it goes through sign-in or sign-up and the bookmark is saved on the way back. Anyone can sign up with an email address and a password, confirmed with an emailed code ([ADR 16](docs/adr/0016-bookmarks-and-self-sign-up.md)).
 
 ## Architecture
 
@@ -62,7 +63,17 @@ Everything runs in `ap-southeast-2` (Sydney). Generation uses the `au.` cross-re
 
 - There's one OpenSearch node with no replicas, and everything is deleted on teardown (`RemovalPolicy.DESTROY`).
 - There's no MFA.
-- The data is a sample of about 3,750 of the Museum's 97,000 objects.
+- The data is a sample of about 3,900 of the Museum's 97,000 objects.
+
+## Crawlers, abuse and cost
+
+The site is public, and crawlers found it within hours of going live: about 24,000 requests in one evening, which used the search API's whole daily quota. What bounds them now:
+
+- **`robots.txt`** allows only the home page (and link-preview bots, which fetch just the page someone shared). Results, sign-in and bookmark pages are `noindex`; filter, result and paging links are `nofollow`.
+- **Per-address limits** in the web server: 6 AI answers, 20 form posts and 60 pages a minute. The address comes from API Gateway, so a forged `X-Forwarded-For` header doesn't help.
+- **AI answers only start from a person's action:** a question searched from the site's own pages, or the "Ask AI" button. A URL fetched by a tool never starts one (ADR 15).
+- **Hard limits:** 500 answers a day for everyone together, a 20,000-a-day search quota, gateway throttling and capped Lambda concurrency.
+- **Alerts:** emails when the answer allowance runs out, when site traffic passes 20,000 requests an hour, when sign-ups pass 20 a day, and (Cost Anomaly Detection) when daily spend jumps by more than $5.
 
 ## Running it
 
