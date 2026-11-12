@@ -1,0 +1,16 @@
+---
+import Icon from './Icon.astro';
+
+/**
+ * A link out of the app that opens in a new tab, so leaving doesn't lose the search and the open
+ * object. Announces that to screen readers and shows an icon for everyone else.
+ */
+interface Props {
+  href: string;
+}
+const { href } = Astro.props;
+---
+
+<a href={href} target="_blank" rel="noopener noreferrer">
+  <slot /><span class="visually-hidden"> (opens in a new tab)</span><Icon name="external" class="external-icon" />
+</a>

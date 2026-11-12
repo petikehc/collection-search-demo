@@ -1,6 +1,7 @@
 ---
 import type { CollectionObject } from '../../../functions/lib/nma/normalise.js';
 import BookmarkButton from './BookmarkButton.astro';
+import ExternalLink from './ExternalLink.astro';
 
 /**
  * One object's record, read live from the Museum's Collection API: on its own page, and in the
@@ -64,7 +65,7 @@ const descriptions = [
             {/* Hotlinked from the Museum, never copied: its terms require this. */}
             <img src={image.previewUrl ?? image.thumbnailUrl} alt="" loading="lazy" />
             <figcaption>
-              {image.rightsUrl ? <a href={image.rightsUrl}>{image.rightsTitle}</a> : image.rightsTitle}
+              {image.rightsUrl ? <ExternalLink href={image.rightsUrl}>{image.rightsTitle}</ExternalLink> : image.rightsTitle}
             </figcaption>
           </figure>
         ))}
@@ -98,7 +99,7 @@ const descriptions = [
 
   <p class:list={['message', object.images.length === 0 ? '' : 'plain']}>
     {object.images.length === 0 && "The Museum doesn't provide an image of this object here, but its website may have one. "}
-    <a href={object.sourceUrl}>See this record on the National Museum of Australia's website</a>.
+    <ExternalLink href={object.sourceUrl}>See this record on the National Museum of Australia's website</ExternalLink>.
   </p>
 
   <p class="muted small">
