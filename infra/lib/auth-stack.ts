@@ -8,6 +8,8 @@ import {
   Stack,
   type StackProps,
 } from 'aws-cdk-lib';
+import { Alarm, ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
+import { SnsAction } from 'aws-cdk-lib/aws-cloudwatch-actions';
 import {
   AccountRecovery,
   CfnManagedLoginBranding,
@@ -18,8 +20,15 @@ import {
   UserPool,
   type UserPoolClient,
   UserPoolClientIdentityProvider,
+  UserPoolOperation,
+  VerificationEmailStyle,
 } from 'aws-cdk-lib/aws-cognito';
+import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
+import { LogGroup } from 'aws-cdk-lib/aws-logs';
 import { Secret } from 'aws-cdk-lib/aws-secretsmanager';
+import { Topic } from 'aws-cdk-lib/aws-sns';
+import { EmailSubscription } from 'aws-cdk-lib/aws-sns-subscriptions';
+import { StringParameter } from 'aws-cdk-lib/aws-ssm';
 import type { Construct } from 'constructs';
 import {
   CLI_CALLBACK_URL,
@@ -29,11 +38,18 @@ import {
   webCallbackUrl,
   webLogoutUrl,
 } from '../../functions/lib/auth/constants.js';
+import { LAMBDA_DEFAULTS } from './lambda-defaults.js';
+import { ALARM_EMAIL_PARAMETER } from './monitoring.js';
+import { FUNCTIONS_DIR } from './opensearch-role.js';
+
+/** Sign-ups in a day that suggest scripts rather than people (each one also sends an email). */
+export const SIGN_UP_ALARM_PER_DAY = 20;
 
 /**
- * Cognito user pool for signing in to favourites (Ask needs no sign-in). Users sign in on Cognito's managed
- * login pages (authorisation code grant with PKCE); there's no sign-up page: an admin creates
- * each user with `pnpm user:create`. API Gateway checks the access token's scopes.
+ * Cognito user pool for bookmarks (search and Ask need no sign-in). Anyone can sign up on
+ * Cognito's managed login pages (email and password, confirmed with an emailed code); sign-in
+ * is the authorisation code grant with PKCE. The owner is emailed about each new account.
+ * API Gateway checks the access token's scopes. `pnpm user:create` still invites someone directly.
  */
 export class AuthStack extends Stack {
   readonly userPool: UserPool;
@@ -48,7 +64,14 @@ export class AuthStack extends Stack {
       userPoolName: 'collection-search',
       // Essentials: managed login v2 (needs more than Lite); 10,000 MAU/month free.
       featurePlan: FeaturePlan.ESSENTIALS,
-      selfSignUpEnabled: false,
+      selfSignUpEnabled: true,
+      // Cognito's own sender (no SES): up to 50 emails a day, which also bounds how many
+      // confirmation codes a script could send to strangers' addresses.
+      userVerification: {
+        emailStyle: VerificationEmailStyle.CODE,
+        emailSubject: 'Your Collection Search Demo code',
+        emailBody: 'Your confirmation code for Collection Search Demo is {####}',
+      },
       signInAliases: { email: true },
       autoVerify: { email: true },
       accountRecovery: AccountRecovery.EMAIL_ONLY,
@@ -66,20 +89,16 @@ export class AuthStack extends Stack {
       managedLoginVersion: ManagedLoginVersion.NEWER_MANAGED_LOGIN,
     });
 
-    const favourites = new ResourceServerScope({
-      scopeName: SCOPES.favourites,
-      scopeDescription: 'Read and change your favourites',
+    const bookmarks = new ResourceServerScope({
+      scopeName: SCOPES.bookmarks,
+      scopeDescription: 'Read and change your bookmarks',
     });
     const api = this.userPool.addResourceServer('Api', {
       identifier: RESOURCE_SERVER,
       userPoolResourceServerName: 'Collection search API',
-      scopes: [favourites],
+      scopes: [bookmarks],
     });
-    const scopes = [
-      OAuthScope.OPENID,
-      OAuthScope.EMAIL,
-      OAuthScope.resourceServer(api, favourites),
-    ];
+    const scopes = [OAuthScope.OPENID, OAuthScope.EMAIL, OAuthScope.resourceServer(api, bookmarks)];
 
     // Shared by both clients: code grant only (no implicit), managed login only (no direct
     // password API calls from the apps), short-lived access tokens.
@@ -138,6 +157,37 @@ export class AuthStack extends Stack {
       });
       style.node.addDependency(domain);
     }
+
+    // Sign-up notifications: a post-confirmation trigger publishes to this topic, which emails
+    // the address in SSM (the same one alarms go to).
+    const signUps = new Topic(this, 'SignUps', { displayName: 'Collection search sign-ups' });
+    signUps.addSubscription(
+      new EmailSubscription(StringParameter.valueForStringParameter(this, ALARM_EMAIL_PARAMETER)),
+    );
+    const notify = new NodejsFunction(this, 'SignUpNotifier', {
+      description: 'Cognito post-confirmation trigger: emails the owner about each new account',
+      ...LAMBDA_DEFAULTS,
+      entry: `${FUNCTIONS_DIR}sign-up/handler.ts`,
+      memorySize: 256,
+      timeout: Duration.seconds(5),
+      logGroup: new LogGroup(this, 'SignUpNotifierLogs'),
+      environment: { ...LAMBDA_DEFAULTS.environment, SIGN_UPS_TOPIC_ARN: signUps.topicArn },
+    });
+    signUps.grantPublish(notify);
+    this.userPool.addTrigger(UserPoolOperation.POST_CONFIRMATION, notify);
+
+    // Many sign-ups in a day suggests scripts: each one also sent an email to someone.
+    new Alarm(this, 'ManySignUps', {
+      alarmDescription: `More than ${SIGN_UP_ALARM_PER_DAY} sign-ups today: probably scripts, not people`,
+      metric: signUps.metricNumberOfMessagesPublished({
+        period: Duration.days(1),
+        statistic: 'Sum',
+      }),
+      threshold: SIGN_UP_ALARM_PER_DAY,
+      comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new SnsAction(signUps));
 
     this.loginBaseUrl = domain.baseUrl();
     this.webClientSecret = webSecret;

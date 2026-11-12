@@ -8,7 +8,7 @@ import { getConfig } from './config.js';
 export type SearchResponse = components['schemas']['SearchResponse'];
 export type SearchParams = NonNullable<operations['searchObjects']['parameters']['query']>;
 export type AskResponse = components['schemas']['AskResponse'];
-export type Favourite = components['schemas']['Favourite'];
+export type Bookmark = components['schemas']['Bookmark'];
 
 export class ApiError extends Error {
   constructor(
@@ -32,20 +32,20 @@ export function ask(question: string): Promise<AskResponse> {
   return call<AskResponse>('POST', 'ask', { body: { question } });
 }
 
-export async function listFavourites(accessToken: string): Promise<Favourite[]> {
-  const res = await call<{ favourites: Favourite[] }>('GET', 'favourites', { accessToken });
-  return res.favourites;
+export async function listBookmarks(accessToken: string): Promise<Bookmark[]> {
+  const res = await call<{ bookmarks: Bookmark[] }>('GET', 'bookmarks', { accessToken });
+  return res.bookmarks;
 }
 
-export function addFavourite(accessToken: string, objectId: string, title: string) {
-  return call<Favourite>('PUT', `favourites/${encodeURIComponent(objectId)}`, {
+export function addBookmark(accessToken: string, objectId: string, title: string) {
+  return call<Bookmark>('PUT', `bookmarks/${encodeURIComponent(objectId)}`, {
     accessToken,
     body: { title },
   });
 }
 
-export function removeFavourite(accessToken: string, objectId: string) {
-  return call<void>('DELETE', `favourites/${encodeURIComponent(objectId)}`, { accessToken });
+export function removeBookmark(accessToken: string, objectId: string) {
+  return call<void>('DELETE', `bookmarks/${encodeURIComponent(objectId)}`, { accessToken });
 }
 
 async function call<T>(

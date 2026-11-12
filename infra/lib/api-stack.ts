@@ -39,7 +39,7 @@ const OPENAPI_FILE = new URL('../../openapi.yaml', import.meta.url);
 export interface ApiStackProps extends StackProps {
   search: SearchStack;
   ai: AiStack;
-  /** Signs users in for /ask and /favourites. */
+  /** Signs users in for /ask and /bookmarks. */
   userPool: IUserPool;
 }
 
@@ -170,33 +170,28 @@ export class ApiStack extends Stack {
       }),
     );
 
-    // Favourites: one partition per user. On-demand billing: nothing is charged while idle.
-    const favouritesTable = new TableV2(this, 'Favourites', {
+    // Bookmarks: one partition per user. On-demand billing: nothing is charged while idle.
+    const bookmarksTable = new TableV2(this, 'Bookmarks', {
       partitionKey: { name: 'sub', type: AttributeType.STRING },
       sortKey: { name: 'objectId', type: AttributeType.STRING },
       removalPolicy: RemovalPolicy.DESTROY,
     });
-    const favouritesFn = new NodejsFunction(this, 'FavouritesFunction', {
-      description: "/favourites: the signed-in user's favourite objects in DynamoDB",
+    const bookmarksFn = new NodejsFunction(this, 'BookmarksFunction', {
+      description: "/bookmarks: the signed-in user's bookmarked objects in DynamoDB",
       ...LAMBDA_DEFAULTS,
-      entry: `${FUNCTIONS_DIR}favourites/handler.ts`,
+      entry: `${FUNCTIONS_DIR}bookmarks/handler.ts`,
       memorySize: 256,
       timeout: Duration.seconds(5),
       tracing: Tracing.ACTIVE,
-      logGroup: new LogGroup(this, 'FavouritesLogs'),
+      logGroup: new LogGroup(this, 'BookmarksLogs'),
       environment: {
         ...LAMBDA_DEFAULTS.environment,
-        TABLE_NAME: favouritesTable.tableName,
-        POWERTOOLS_SERVICE_NAME: 'favourites',
+        TABLE_NAME: bookmarksTable.tableName,
+        POWERTOOLS_SERVICE_NAME: 'bookmarks',
       },
     });
     // Only the three calls the handler makes; no Scan, so the function can't list other users.
-    favouritesTable.grant(
-      favouritesFn,
-      'dynamodb:Query',
-      'dynamodb:PutItem',
-      'dynamodb:DeleteItem',
-    );
+    bookmarksTable.grant(bookmarksFn, 'dynamodb:Query', 'dynamodb:PutItem', 'dynamodb:DeleteItem');
 
     const api = new SpecRestApi(this, 'Api', {
       restApiName: 'collection-search',
@@ -205,7 +200,7 @@ export class ApiStack extends Stack {
           {
             search: searchFn.functionArn,
             ask: askFn.functionArn,
-            favourites: favouritesFn.functionArn,
+            bookmarks: bookmarksFn.functionArn,
           },
           props.userPool.userPoolArn,
         ),
@@ -235,9 +230,9 @@ export class ApiStack extends Stack {
       principal: new ServicePrincipal('apigateway.amazonaws.com'),
       sourceArn: api.arnForExecuteApi('POST', '/ask', STAGE),
     });
-    favouritesFn.addPermission('InvokeFromApi', {
+    bookmarksFn.addPermission('InvokeFromApi', {
       principal: new ServicePrincipal('apigateway.amazonaws.com'),
-      sourceArn: api.arnForExecuteApi('*', '/favourites*', STAGE),
+      sourceArn: api.arnForExecuteApi('*', '/bookmarks*', STAGE),
     });
 
     // The key the Astro server sends. Generated into Secrets Manager; the template only holds
@@ -260,7 +255,7 @@ export class ApiStack extends Stack {
       api,
       searchFn,
       askFn,
-      favouritesFn,
+      bookmarksFn,
       ingestFn: props.search.ingestFn,
       domain,
       askModelId: ASK_PROFILE_ID,
@@ -275,7 +270,7 @@ export class ApiStack extends Stack {
     new CfnOutput(this, 'AlarmTopicArn', { value: monitoring.topic.topicArn });
     new CfnOutput(this, 'ApiKeySecretArn', { value: keySecret.secretArn });
     new CfnOutput(this, 'SearchFunctionName', { value: searchFn.functionName });
-    new CfnOutput(this, 'FavouritesTableName', { value: favouritesTable.tableName });
+    new CfnOutput(this, 'BookmarksTableName', { value: bookmarksTable.tableName });
     new CfnOutput(this, 'AskModelArn', { value: askProfileArn });
     new CfnOutput(this, 'GuardrailId', { value: guardrail.guardrailId });
     new CfnOutput(this, 'GuardrailVersion', { value: guardrail.version });
@@ -287,7 +282,7 @@ export class ApiStack extends Stack {
  * where the Lambda ARN is known.
  */
 function withIntegrations(
-  functionArns: { search: string; ask: string; favourites: string },
+  functionArns: { search: string; ask: string; bookmarks: string },
   userPoolArn: string,
 ) {
   const spec = parse(readFileSync(OPENAPI_FILE, 'utf8'));
@@ -318,11 +313,11 @@ function withIntegrations(
   spec.paths['/ask'].post['x-amazon-apigateway-request-validator'] = 'body';
   spec.paths['/ask'].post['x-amazon-apigateway-integration'] = lambdaProxy(functionArns.ask);
 
-  const favourites = lambdaProxy(functionArns.favourites);
-  spec.paths['/favourites'].get['x-amazon-apigateway-integration'] = favourites;
-  spec.paths['/favourites/{objectId}'].put['x-amazon-apigateway-request-validator'] = 'body';
-  spec.paths['/favourites/{objectId}'].put['x-amazon-apigateway-integration'] = favourites;
-  spec.paths['/favourites/{objectId}'].delete['x-amazon-apigateway-integration'] = favourites;
+  const bookmarks = lambdaProxy(functionArns.bookmarks);
+  spec.paths['/bookmarks'].get['x-amazon-apigateway-integration'] = bookmarks;
+  spec.paths['/bookmarks/{objectId}'].put['x-amazon-apigateway-request-validator'] = 'body';
+  spec.paths['/bookmarks/{objectId}'].put['x-amazon-apigateway-integration'] = bookmarks;
+  spec.paths['/bookmarks/{objectId}'].delete['x-amazon-apigateway-integration'] = bookmarks;
 
   // Answered by API Gateway itself: no Lambda, no cost beyond the request.
   spec.paths['/health'].get['x-amazon-apigateway-integration'] = {

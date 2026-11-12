@@ -1,49 +1,49 @@
 import type { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import type { components } from '../api/types.gen.js';
 
-export type Favourite = components['schemas']['Favourite'];
+export type Bookmark = components['schemas']['Bookmark'];
 
-/** Where favourites live. One partition per user (their Cognito `sub`), one item per object. */
-export interface FavouritesStore {
-  list(sub: string): Promise<Favourite[]>;
-  put(sub: string, favourite: Favourite): Promise<void>;
+/** Where bookmarks live. One partition per user (their Cognito `sub`), one item per object. */
+export interface BookmarksStore {
+  list(sub: string): Promise<Bookmark[]>;
+  put(sub: string, bookmark: Bookmark): Promise<void>;
   remove(sub: string, objectId: string): Promise<void>;
 }
 
 const OBJECT_ID = /^[0-9]{1,12}$/;
 
 /**
- * GET /favourites, PUT and DELETE /favourites/{objectId}.
+ * GET /bookmarks, PUT and DELETE /bookmarks/{objectId}.
  *
  * The user comes only from the token claims API Gateway has already verified, never from the
- * path, query or body, so one user can't read or change another's favourites.
+ * path, query or body, so one user can't read or change another's bookmarks.
  */
-export async function handleFavourites(
+export async function handleBookmarks(
   event: APIGatewayProxyEvent,
-  store: FavouritesStore,
+  store: BookmarksStore,
   now = () => new Date(),
 ): Promise<APIGatewayProxyResult> {
   const sub = event.requestContext?.authorizer?.claims?.sub;
   if (typeof sub !== 'string' || !sub) return json(401, { message: 'Unauthorized' });
 
   const route = `${event.httpMethod} ${event.resource}`;
-  if (route === 'GET /favourites') {
-    const favourites = await store.list(sub);
-    favourites.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
-    return json(200, { favourites });
+  if (route === 'GET /bookmarks') {
+    const bookmarks = await store.list(sub);
+    bookmarks.sort((a, b) => b.addedAt.localeCompare(a.addedAt));
+    return json(200, { bookmarks });
   }
 
   const objectId = event.pathParameters?.objectId ?? '';
   if (!OBJECT_ID.test(objectId)) return json(400, { message: 'objectId must be digits' });
 
-  if (route === 'PUT /favourites/{objectId}') {
+  if (route === 'PUT /bookmarks/{objectId}') {
     const title = parseTitle(event.body);
     if (title === undefined) return json(400, { message: 'Body must be {"title": "..."}' });
-    const favourite = { objectId, title, addedAt: now().toISOString() };
-    await store.put(sub, favourite);
-    return json(200, favourite);
+    const bookmark = { objectId, title, addedAt: now().toISOString() };
+    await store.put(sub, bookmark);
+    return json(200, bookmark);
   }
-  if (route === 'DELETE /favourites/{objectId}') {
+  if (route === 'DELETE /bookmarks/{objectId}') {
     await store.remove(sub, objectId);
     return { statusCode: 204, headers: {}, body: '' };
   }

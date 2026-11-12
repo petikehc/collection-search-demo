@@ -2,7 +2,7 @@ import { defineMiddleware } from 'astro:middleware';
 import { currentUser } from './lib/session.js';
 
 /** Pages that need a signed-in user. API Gateway checks the token again; this is for the UI. */
-const PROTECTED = ['/favourites'];
+const PROTECTED = ['/bookmarks'];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const { url, cookies, locals, redirect, request } = context;

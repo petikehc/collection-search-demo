@@ -1,15 +1,11 @@
 import type { APIGatewayProxyEvent } from 'aws-lambda';
 import { describe, expect, it } from 'vitest';
-import {
-  type Favourite,
-  type FavouritesStore,
-  handleFavourites,
-} from '../lib/favourites/favourites.js';
+import { type Bookmark, type BookmarksStore, handleBookmarks } from '../lib/bookmarks/bookmarks.js';
 
 /** In-memory store keyed like the table: (sub, objectId). */
 function memoryStore() {
-  const items = new Map<string, Favourite & { sub: string }>();
-  const store: FavouritesStore = {
+  const items = new Map<string, Bookmark & { sub: string }>();
+  const store: BookmarksStore = {
     async list(sub) {
       return [...items.values()]
         .filter((i) => i.sub === sub)
@@ -43,23 +39,23 @@ const event = (
 
 const at = (iso: string) => () => new Date(iso);
 
-describe('handleFavourites', () => {
-  it('adds, lists newest first and removes favourites for the signed-in user', async () => {
+describe('handleBookmarks', () => {
+  it('adds, lists newest first and removes bookmarks for the signed-in user', async () => {
     const { store } = memoryStore();
     const put = (id: string, title: string, iso: string) =>
-      handleFavourites(
-        event('PUT', '/favourites/{objectId}', { sub: 'alice', objectId: id, body: { title } }),
+      handleBookmarks(
+        event('PUT', '/bookmarks/{objectId}', { sub: 'alice', objectId: id, body: { title } }),
         store,
         at(iso),
       );
     expect((await put('1', 'Firestick', '2026-11-01T00:00:00Z')).statusCode).toBe(200);
     await put('2', 'Woomera', '2026-11-02T00:00:00Z');
 
-    const list = await handleFavourites(event('GET', '/favourites', { sub: 'alice' }), store);
-    expect(JSON.parse(list.body).favourites.map((f: Favourite) => f.objectId)).toEqual(['2', '1']);
+    const list = await handleBookmarks(event('GET', '/bookmarks', { sub: 'alice' }), store);
+    expect(JSON.parse(list.body).bookmarks.map((f: Bookmark) => f.objectId)).toEqual(['2', '1']);
 
-    const del = await handleFavourites(
-      event('DELETE', '/favourites/{objectId}', { sub: 'alice', objectId: '1' }),
+    const del = await handleBookmarks(
+      event('DELETE', '/bookmarks/{objectId}', { sub: 'alice', objectId: '1' }),
       store,
     );
     expect(del.statusCode).toBe(204);
@@ -75,10 +71,10 @@ describe('handleFavourites', () => {
     });
 
     // Bob can't see Alice's list, and a `sub` smuggled into the body is ignored.
-    const bobs = await handleFavourites(event('GET', '/favourites', { sub: 'bob' }), store);
-    expect(JSON.parse(bobs.body).favourites).toEqual([]);
-    await handleFavourites(
-      event('PUT', '/favourites/{objectId}', {
+    const bobs = await handleBookmarks(event('GET', '/bookmarks', { sub: 'bob' }), store);
+    expect(JSON.parse(bobs.body).bookmarks).toEqual([]);
+    await handleBookmarks(
+      event('PUT', '/bookmarks/{objectId}', {
         sub: 'bob',
         objectId: '9',
         body: { title: 'x', sub: 'alice' },
@@ -89,8 +85,8 @@ describe('handleFavourites', () => {
     expect(items.has('alice|9')).toBe(false);
 
     // Deleting "Alice's" object as Bob removes nothing of Alice's.
-    await handleFavourites(
-      event('DELETE', '/favourites/{objectId}', { sub: 'bob', objectId: '1' }),
+    await handleBookmarks(
+      event('DELETE', '/bookmarks/{objectId}', { sub: 'bob', objectId: '1' }),
       store,
     );
     expect(items.has('alice|1')).toBe(true);
@@ -98,14 +94,14 @@ describe('handleFavourites', () => {
 
   it('refuses requests without verified claims (should never reach the Lambda)', async () => {
     const { store } = memoryStore();
-    expect((await handleFavourites(event('GET', '/favourites'), store)).statusCode).toBe(401);
+    expect((await handleBookmarks(event('GET', '/bookmarks'), store)).statusCode).toBe(401);
   });
 
   it('validates the object ID and title', async () => {
     const { store } = memoryStore();
     const put = (objectId: string, body: unknown) =>
-      handleFavourites(
-        event('PUT', '/favourites/{objectId}', { sub: 'alice', objectId, body }),
+      handleBookmarks(
+        event('PUT', '/bookmarks/{objectId}', { sub: 'alice', objectId, body }),
         store,
       );
     expect((await put('12a', { title: 'x' })).statusCode).toBe(400);

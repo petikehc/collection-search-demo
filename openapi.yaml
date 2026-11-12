@@ -63,47 +63,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
 
-  /favourites:
+  /bookmarks:
     get:
-      operationId: listFavourites
-      summary: The signed-in user's favourite objects, newest first
+      operationId: listBookmarks
+      summary: The signed-in user's bookmarked objects, newest first
       security:
-        - cognito: [collection-search/favourites]
+        - cognito: [collection-search/bookmarks]
           apiKey: []
       responses:
         "200":
-          description: The user's favourites
+          description: The user's bookmarks
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FavouritesResponse"
+                $ref: "#/components/schemas/BookmarksResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
           $ref: "#/components/responses/Forbidden"
 
-  /favourites/{objectId}:
+  /bookmarks/{objectId}:
     parameters:
       - $ref: "#/components/parameters/ObjectId"
     put:
-      operationId: addFavourite
-      summary: Add an object to the signed-in user's favourites (repeating it is harmless)
+      operationId: addBookmark
+      summary: Add an object to the signed-in user's bookmarks (repeating it is harmless)
       security:
-        - cognito: [collection-search/favourites]
+        - cognito: [collection-search/bookmarks]
           apiKey: []
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FavouriteRequest"
+              $ref: "#/components/schemas/BookmarkRequest"
       responses:
         "200":
           description: Saved
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Favourite"
+                $ref: "#/components/schemas/Bookmark"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -111,10 +111,10 @@ paths:
         "403":
           $ref: "#/components/responses/Forbidden"
     delete:
-      operationId: removeFavourite
-      summary: Remove an object from the signed-in user's favourites (removing a missing one is harmless)
+      operationId: removeBookmark
+      summary: Remove an object from the signed-in user's bookmarks (removing a missing one is harmless)
       security:
-        - cognito: [collection-search/favourites]
+        - cognito: [collection-search/bookmarks]
           apiKey: []
       responses:
         "204":
@@ -248,14 +248,14 @@ components:
           description: INTERVENED when the guardrail blocked the question or the answer
         attribution: { type: string }
 
-    FavouriteRequest:
+    BookmarkRequest:
       type: object
       required: [title]
       additionalProperties: false
       properties:
         title: { type: string, minLength: 1, maxLength: 300 }
 
-    Favourite:
+    Bookmark:
       type: object
       required: [objectId, title, addedAt]
       properties:
@@ -263,14 +263,14 @@ components:
         title: { type: string }
         addedAt: { type: string, format: date-time }
 
-    FavouritesResponse:
+    BookmarksResponse:
       type: object
-      required: [favourites]
+      required: [bookmarks]
       properties:
-        favourites:
+        bookmarks:
           type: array
           items:
-            $ref: "#/components/schemas/Favourite"
+            $ref: "#/components/schemas/Bookmark"
 
     Health:
       type: object
