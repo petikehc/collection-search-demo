@@ -1,0 +1,39 @@
+---
+import Icon from './Icon.astro';
+
+/**
+ * Adds or removes a bookmark with a form POST (never a link: changing data on GET would let
+ * any page or crawler do it). Signed out, the same POST starts sign-in and the bookmark is
+ * saved on the way back (see pages/bookmarks.astro).
+ */
+interface Props {
+  objectId: string;
+  title: string;
+  bookmarked: boolean;
+  /** Where to land afterwards: the page the button is on. */
+  returnTo: string;
+  /** `icon` in result lists; `button` (with a label) on an object's record. */
+  variant?: 'icon' | 'button';
+}
+const { objectId, title, bookmarked, returnTo, variant = 'icon' } = Astro.props;
+const label = bookmarked ? `Remove bookmark: ${title}` : `Bookmark: ${title}`;
+---
+
+<form method="post" action="/bookmarks" class="bookmark-form">
+  <input type="hidden" name="action" value={bookmarked ? 'remove' : 'add'} />
+  <input type="hidden" name="objectId" value={objectId} />
+  <input type="hidden" name="title" value={title.slice(0, 300)} />
+  <input type="hidden" name="returnTo" value={returnTo} />
+  {
+    variant === 'icon' ? (
+      <button type="submit" class="icon-button" aria-label={label} aria-pressed={bookmarked}>
+        <Icon name={bookmarked ? 'bookmarked' : 'bookmark'} />
+      </button>
+    ) : (
+      <button type="submit" class:list={['button', bookmarked ? 'secondary' : 'dark']} aria-pressed={bookmarked}>
+        <Icon name={bookmarked ? 'bookmarked' : 'bookmark'} />
+        <span>{bookmarked ? 'Bookmarked' : 'Bookmark'}</span>
+      </button>
+    )
+  }
+</form>

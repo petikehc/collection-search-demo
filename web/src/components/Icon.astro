@@ -1,0 +1,41 @@
+---
+/**
+ * Inline stroke icons (no icon font, no requests). Decorative by default: give the surrounding
+ * control a text label or an aria-label.
+ */
+interface Props {
+  name: 'bookmark' | 'bookmarked' | 'search' | 'chevron-down' | 'close' | 'back' | 'sparkle';
+  class?: string;
+}
+const { name, class: className = 'icon' } = Astro.props;
+---
+
+<svg
+  class={className}
+  aria-hidden="true"
+  viewBox="0 0 24 24"
+  fill="none"
+  stroke="currentColor"
+  stroke-width="2"
+  stroke-linecap="round"
+  stroke-linejoin="round"
+>
+  {name === 'bookmark' && <path d="M6 3h12v18l-6-4.5L6 21z" />}
+  {name === 'bookmarked' && <path d="M6 3h12v18l-6-4.5L6 21z" fill="currentColor" />}
+  {
+    name === 'search' && (
+      <>
+        <circle cx="11" cy="11" r="7" />
+        <path d="M16.5 16.5L21 21" />
+      </>
+    )
+  }
+  {name === 'chevron-down' && <path d="M6 9l6 6 6-6" />}
+  {name === 'close' && <path d="M6 6l12 12M18 6L6 18" />}
+  {name === 'back' && <path d="M15 18l-6-6 6-6" />}
+  {
+    name === 'sparkle' && (
+      <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+    )
+  }
+</svg>
