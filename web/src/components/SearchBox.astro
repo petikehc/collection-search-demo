@@ -1,0 +1,32 @@
+---
+import Icon from './Icon.astro';
+
+/** The one search box: keywords or a question. Plain GET form, so it works with JavaScript off. */
+interface Props {
+  value?: string;
+  /** `hero` on the home page; `compact` in the results header. */
+  size?: 'hero' | 'compact';
+  /** Filters to keep when searching again from the results. */
+  keep?: Record<string, string | undefined>;
+}
+const { value = '', size = 'compact', keep = {} } = Astro.props;
+const id = `q-${size}`;
+---
+
+<form class:list={['search-box', size]} action="/search" method="get" role="search">
+  <label for={id} class="visually-hidden">Search the collection, or ask a question</label>
+  <input
+    id={id}
+    name="q"
+    type="search"
+    value={value}
+    maxlength="200"
+    placeholder="Search, or ask a question"
+    autocomplete="off"
+  />
+  {Object.entries(keep).map(([name, v]) => v && <input type="hidden" name={name} value={v} />)}
+  <button type="submit" class="button">
+    <Icon name="search" />
+    <span class:list={[size === 'compact' && 'search-label']}>Search</span>
+  </button>
+</form>

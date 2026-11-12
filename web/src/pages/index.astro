@@ -1,154 +1,94 @@
 ---
+import FilterMenu from '../components/FilterMenu.astro';
+import SearchBox from '../components/SearchBox.astro';
 import Base from '../layouts/Base.astro';
-import { ApiError, type SearchParams, type SearchResponse, search } from '../lib/api.js';
+import { getHomeData, type HomeData } from '../lib/home.js';
+import { withFilter } from '../lib/search-url.js';
 
-const q = Astro.url.searchParams;
-const int = (name: string) => {
-  const value = Number.parseInt(q.get(name) ?? '', 10);
-  return Number.isFinite(value) ? value : undefined;
-};
-const params: SearchParams = {
-  q: q.get('q') ?? undefined,
-  type: q.get('type') ?? undefined,
-  place: q.get('place') ?? undefined,
-  yearFrom: int('yearFrom'),
-  yearTo: int('yearTo'),
-  page: int('page'),
-  size: 20,
-};
-
-let result: SearchResponse | undefined;
-let error: string | undefined;
+let data: HomeData | undefined;
 try {
-  result = await search(params);
+  data = await getHomeData();
 } catch (err) {
-  error =
-    err instanceof ApiError && err.status === 400
-      ? err.message
-      : 'Search is unavailable right now. Please try again shortly.';
-  if (!(err instanceof ApiError && err.status === 400)) console.error('search failed', err);
+  console.error('home data failed', err);
 }
-
-/** This page's URL with some parameters changed (undefined removes one); always back to page 1. */
-const withParams = (changes: Record<string, string | number | undefined>) => {
-  const next = new URLSearchParams(Astro.url.search);
-  next.delete('page');
-  for (const [key, value] of Object.entries(changes)) {
-    if (value === undefined) next.delete(key);
-    else next.set(key, String(value));
-  }
-  return `/?${next}`;
-};
-const pageLink = (page: number) => {
-  const next = new URLSearchParams(Astro.url.search);
-  next.set('page', String(page));
-  return `/?${next}`;
-};
-const page = result?.page ?? 1;
-const lastPage = result ? Math.min(100, Math.ceil(result.total / result.size)) : 1;
+const filters = data
+  ? [
+      {
+        label: 'Type',
+        options: data.facets.types.map((f) => ({
+          label: f.value,
+          count: f.count,
+          href: withFilter({}, { type: f.value }),
+        })),
+      },
+      {
+        label: 'Place',
+        options: data.facets.places.map((f) => ({
+          label: f.value,
+          count: f.count,
+          href: withFilter({}, { place: f.value }),
+        })),
+      },
+      {
+        label: 'Decade',
+        options: data.facets.decades.map((d) => ({
+          label: `${d.decade}s`,
+          count: d.count,
+          href: withFilter({}, { yearFrom: d.decade, yearTo: d.decade + 9 }),
+        })),
+      },
+    ]
+  : [];
+const count = data ? data.total.toLocaleString('en-AU') : 'thousands of';
 ---
 
-<Base title={params.q ? `“${params.q}”` : 'Search'}>
-  <h1>Search the collection</h1>
-  <form class="search-form" method="get" action="/" role="search">
-    <label class="visually-hidden" for="q">Search</label>
-    <input id="q" type="search" name="q" value={params.q ?? ''} placeholder="e.g. spearthrower, telegraph, quilt" maxlength="200" />
-    {params.type && <input type="hidden" name="type" value={params.type} />}
-    {params.place && <input type="hidden" name="place" value={params.place} />}
-    <input type="number" name="yearFrom" value={params.yearFrom ?? ''} placeholder="From year" min="0" max="2100" aria-label="From year" />
-    <input type="number" name="yearTo" value={params.yearTo ?? ''} placeholder="To year" min="0" max="2100" aria-label="To year" />
-    <button type="submit">Search</button>
-  </form>
+<Base title="Search the collection" width="narrow">
+  <div slot="band" class="container narrow home-hero">
+    <h1>Search {count} objects from the National Museum of Australia</h1>
+    <SearchBox size="hero" />
+    <div class="filter-row">
+      {filters.map((f) => <FilterMenu label={f.label} options={f.options} />)}
+      <a class="filter-link" href={withFilter({}, { hasImage: true })} rel="nofollow">
+        With images only
+      </a>
+    </div>
+    <p class="hint">
+      Try <a href="/search?q=woomera" rel="nofollow">woomera</a>, or ask{' '}
+      <a href="/search?q=What+did+people+use+to+start+fires%3F" rel="nofollow"
+        >What did people use to start fires?</a
+      >{' '}
+      Questions are answered by an AI model from the Museum's records, so please don't include
+      personal details.
+    </p>
+  </div>
 
-  {
-    (params.type || params.place || params.yearFrom || params.yearTo) && (
-      <p class="filters">
-        <span class="muted">Filters:</span>
-        {params.type && <a href={withParams({ type: undefined })}>Type: {params.type} ✕</a>}
-        {params.place && <a href={withParams({ place: undefined })}>Place: {params.place} ✕</a>}
-        {(params.yearFrom || params.yearTo) && (
-          <a href={withParams({ yearFrom: undefined, yearTo: undefined })}>
-            Years: {params.yearFrom ?? '…'}–{params.yearTo ?? '…'} ✕
-          </a>
-        )}
-      </p>
-    )
-  }
-
-  {error && <p class="error" role="alert">{error}</p>}
-
-  {
-    result && (
-      <div class="search-layout">
-        <aside class="facets" aria-label="Refine">
-          <h2>Type</h2>
-          <ul>
-            {result.facets.types.map((f) => (
+  <div class="container narrow page">
+    {
+      !data && (
+        <p class="message error" role="alert">
+          Search is unavailable right now. Please try again shortly.
+        </p>
+      )
+    }
+    {
+      data && data.featured.length > 0 && (
+        <section class="featured" aria-labelledby="featured-heading">
+          <h2 id="featured-heading">From the collection today</h2>
+          <ul class="featured-grid">
+            {data.featured.map((o) => (
               <li>
-                <a href={withParams({ type: f.value })}>{f.value}</a>
-                <span class="muted">{f.count}</span>
+                <a href={`/object/${o.id}`}>
+                  <img src={o.thumbnail?.url} alt="" loading="lazy" width="320" height="240" />
+                  <span class="featured-title">{o.title}</span>
+                  <span class="muted small">
+                    {[o.types[0], o.dateLabel ?? o.places[0]].filter(Boolean).join(', ')}
+                  </span>
+                </a>
               </li>
             ))}
           </ul>
-          <h2>Place</h2>
-          <ul>
-            {result.facets.places.map((f) => (
-              <li>
-                <a href={withParams({ place: f.value })}>{f.value}</a>
-                <span class="muted">{f.count}</span>
-              </li>
-            ))}
-          </ul>
-          {result.facets.decades.length > 0 && (
-            <>
-              <h2>Decade</h2>
-              <p class="muted">{result.facets.datedCount} of these objects have a date.</p>
-              <ul>
-                {result.facets.decades.map((d) => (
-                  <li>
-                    <a href={withParams({ yearFrom: d.decade, yearTo: d.decade + 9 })}>{d.decade}s</a>
-                    <span class="muted">{d.count}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-        </aside>
-
-        <section aria-label="Results">
-          <p class="muted">
-            {result.total.toLocaleString('en-AU')} {result.total === 1 ? 'object' : 'objects'}
-            {result.total >= 10000 && ' or more'}
-          </p>
-          <ol class="results">
-            {result.results.map((r) => (
-              <li class="result">
-                {r.thumbnail ? (
-                  <img src={r.thumbnail.url} alt="" loading="lazy" title={r.thumbnail.rightsTitle} />
-                ) : (
-                  <span class="no-image">No image</span>
-                )}
-                <div>
-                  <h3>
-                    <a href={`/object/${r.id}`}>{r.title}</a>
-                  </h3>
-                  <p class="muted">
-                    {[r.types.join(', '), r.dateLabel, r.places[0]].filter(Boolean).join(' · ')}
-                  </p>
-                  {/* OpenSearch escapes the record text (encoder: html), then adds only <mark>. */}
-                  {r.highlight && <p set:html={r.highlight} />}
-                </div>
-              </li>
-            ))}
-          </ol>
-          {result.results.length === 0 && <p>No objects match. Try fewer words or remove a filter.</p>}
-          <nav class="pager" aria-label="Pages">
-            {page > 1 ? <a href={pageLink(page - 1)}>← Previous</a> : <span />}
-            {page < lastPage && <a href={pageLink(page + 1)}>Next →</a>}
-          </nav>
-          <p class="muted">{result.attribution}</p>
         </section>
-      </div>
-    )
-  }
+      )
+    }
+  </div>
 </Base>
