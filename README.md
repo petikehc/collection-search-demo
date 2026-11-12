@@ -10,7 +10,7 @@ It indexes a sample of the National Museum of Australia's public collection (abo
 
 ## What it does
 
-- **Search** (`/`): keyword search with synonyms (`woomera` finds spear-throwers), stemming, highlighting and facets for type, place and decade. Results come from our own OpenSearch index.
+- **Search** (`/`): hybrid search. Keyword matches (with synonyms, so `woomera` finds spear-throwers, stemming and highlighting) are ranked together with the objects nearest in meaning, so a question or a misspelling still finds related objects. Facets for type, place and decade. Results come from our own OpenSearch index.
 - **Object pages** (`/object/<id>`): read live from the Museum's Collection API, with images hotlinked from the Museum, their rights statements, and a link back to the record.
 - **Ask the collection** (`/ask`, sign-in required): Claude Haiku 4.5 answers from the six most relevant records and cites each one. It says so when the collection doesn't cover a question. A Guardrail blocks valuation requests, prompt attacks and harmful content, masks personal details, and checks answers are grounded in the records. Requests for secret or sacred cultural knowledge are detected and counted for review rather than blocked, because blocking them refused everyday questions about Aboriginal objects ([ADR 7](docs/adr/0007-guardrail-for-ask.md)).
 - **Favourites** (`/favourites`, sign-in required): save objects per user.
@@ -81,7 +81,7 @@ pnpm install
 aws ssm put-parameter --name /collection-search/alarm-email --type String --value you@example.org
 
 pnpm cdk:deploy --all     # every stack except Ci (see below); the Astro build runs during synth
-pnpm ingest               # fetch from the Collection API, build the index, write KB documents (~1 min)
+pnpm ingest               # fetch from the Collection API, embed, build the index, write KB documents (~2 min)
 pnpm kb:sync              # embed the documents into the Knowledge Base (~5 min)
 pnpm user:create you@example.org   # self sign-up is off; Cognito emails a temporary password
 pnpm web                  # optional: the same site locally, at http://localhost:4321
@@ -110,6 +110,8 @@ pnpm cdk:deploy CollectionSearch-Ci --exclusively -c githubSubjectPrefix="$(
 | `pnpm call GET '/search?q=boomerang'`                     | Calls the API with the key and, when needed, a token (opens a browser sign-in) |
 | `pnpm ask "What did people use to start fires?"`          | Asks the collection from the terminal                                          |
 | `pnpm eval`                                               | Runs the evaluation set (see [`evals/`](evals/README.md))                      |
+| `pnpm eval:search`                                        | Compares keyword and hybrid search through the deployed API                    |
+| `pnpm ingest --from objects-<timestamp>`                  | Rebuilds the index from an existing one, without fetching from the Museum      |
 | `pnpm os GET '/_cat/indices?v'`                           | One signed request to OpenSearch, as the admin role                            |
 | `pnpm kb:retrieve "…"`, `pnpm guardrail:test`             | Try retrieval or the Guardrail on their own                                    |
 | `pnpm status` (`--cost` adds spend to date, $0.01 a call) | Deployed stacks and anything billed by the hour                                |
@@ -157,6 +159,7 @@ Each significant choice has an architecture decision record, with the options co
 11. [Spec-first API: one OpenAPI file builds the gateway and types the code](docs/adr/0011-spec-first-openapi.md)
 12. [Data residency: everything in Sydney, generation within Australia, enforced by IAM](docs/adr/0012-data-residency.md)
 13. [Hosting the web front end: Lambda behind an HTTP API on a custom domain](docs/adr/0013-hosting-the-web-front-end.md)
+14. [Hybrid search: keyword and vector matches ranked together, with L2 normalisation](docs/adr/0014-hybrid-search.md)
 
 ## Evaluation
 
@@ -172,6 +175,13 @@ The latest run ([expanded-v2](evals/results/2026-11-11-expanded-v2.md)):
 | --------------- | -------- | ----- | ------------ | ----------- |
 | 96%             | 93%      | 100%  | 4.81 / 5     | 4.33 / 5    |
 
+Search has its own measure, `pnpm eval:search`: how many of the expected objects each mode finds for the same questions, and whether exact-word queries still get exact matches first. The latest run ([search-hybrid](evals/results/2026-11-12-search-hybrid.md)):
+
+| Mode    | Question recall@10 | Question hit@10 | Keyword precision@10 |
+| ------- | ------------------ | --------------- | -------------------- |
+| Keyword | 27%                | 35%             | 100%                 |
+| Hybrid  | 85%                | 100%            | at least 95%         |
+
 ## Known limitations
 
 - **Object pages depend on the Museum's API being up.** If it's down, or slower than 5 seconds, the page shows a clear error rather than the record. Next steps:
@@ -179,7 +189,9 @@ The latest run ([expanded-v2](evals/results/2026-11-11-expanded-v2.md)):
   - fall back to our indexed copy of the record.
 - **Cold starts:** the first page after an idle spell takes about 1.5 seconds longer.
 - **Images:** the Museum's terms allow only API image URLs, hotlinked. Some records have images on the Museum's website that the API doesn't include. In our sample, none of the 39 spear-throwers, boomerangs, shields and coolamons have API images, against 56% of all sampled objects. Those pages link to the record instead, and the app doesn't scrape images.
-- **Retrieval still misses some wordings.** For example, "woomera" isn't linked to "spear-thrower" in the embeddings. Query expansion with the search synonyms fixed most cases (ADR 8). Hybrid keyword and vector retrieval would be next.
+- **Retrieval still misses some wordings.** For example, "woomera" isn't linked to "spear-thrower" in the embeddings. Query expansion with the search synonyms fixed most cases (ADR 8), for Ask and for hybrid search. Embeddings also miss what words mean in context: a question about travel "before cars" returns cars.
+- **A fresh ingest draws a different sample** when the Museum's data has changed, because the sample comes from pages spread across its results. The eval set's expected objects are tied to one sample. Rebuild with `pnpm ingest --from` to keep the same objects (ADR 14).
+- **Hybrid search pages through the best 200 matches only**, and its facet counts include related objects, not only keyword matches.
 - **Sign-out isn't instant revocation.** Access tokens stay valid until they expire, up to one hour (ADR 9).
 - **The trust boundary for deploys is `main`.** CloudFormation's execution role is admin. ADR 10 lists the hardening steps: branch protection, an environment approval, a narrower bootstrap policy, and blocking network egress on runners.
 - **No MFA, one OpenSearch node, sample data** (see above).
