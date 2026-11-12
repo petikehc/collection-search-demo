@@ -92,6 +92,9 @@ importers:
       '@aws-sdk/client-bedrock-agent-runtime':
         specifier: 3.1166.0
         version: 3.1166.0
+      '@aws-sdk/client-bedrock-runtime':
+        specifier: 3.1166.0
+        version: 3.1166.0
       '@aws-sdk/client-dynamodb':
         specifier: 3.1166.0
         version: 3.1166.0
