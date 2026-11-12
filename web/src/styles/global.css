@@ -874,3 +874,39 @@ textarea {
     order: -1;
   }
 }
+
+/* Bookmarks */
+.page > h1 {
+  font-size: clamp(1.75rem, 3vw, 2.25rem);
+}
+
+.bookmark-list {
+  list-style: none;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.bookmark-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding-block: 0.85rem;
+  border-top: 2px solid var(--line);
+}
+
+.bookmark-list li:first-child {
+  border-top: 0;
+}
+
+.bookmark-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.bookmark-title {
+  font-weight: 600;
+}

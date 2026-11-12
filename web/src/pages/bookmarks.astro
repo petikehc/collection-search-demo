@@ -1,14 +1,21 @@
 ---
+import Icon from '../components/Icon.astro';
 import Base from '../layouts/Base.astro';
 import { ApiError, addBookmark, type Bookmark, listBookmarks, removeBookmark } from '../lib/api.js';
-import { safeReturnTo } from '../lib/session.js';
+import { parsePendingBookmark } from '../lib/pending.js';
+import { safeReturnTo, startLogin } from '../lib/session.js';
 
 const user = Astro.locals.user;
-if (!user) return Astro.redirect('/auth/login?returnTo=/bookmarks');
 
 // POST: add or remove, then redirect (so refreshing the page doesn't repeat it).
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
+  const returnTo = safeReturnTo(String(form.get('returnTo') ?? '/bookmarks'));
+  if (!user) {
+    // Signed out: sign in (or sign up) first; the bookmark rides along and is saved on return.
+    const target = await startLogin(Astro.cookies, Astro.url, returnTo, parsePendingBookmark(form));
+    return Astro.redirect(target.toString(), 303);
+  }
   const objectId = String(form.get('objectId') ?? '');
   try {
     if (form.get('action') === 'add') {
@@ -18,15 +25,24 @@ if (Astro.request.method === 'POST') {
     }
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) {
-      return Astro.redirect('/auth/login?returnTo=/bookmarks');
+      const target = await startLogin(
+        Astro.cookies,
+        Astro.url,
+        returnTo,
+        parsePendingBookmark(form),
+      );
+      return Astro.redirect(target.toString(), 303);
     }
     console.error('bookmarks change failed', err);
-    return new Response('Could not update your bookmarks. Go back and try again.', {
+    return new Response('Your bookmarks could not be updated. Go back and try again.', {
       status: 502,
     });
   }
-  return Astro.redirect(safeReturnTo(String(form.get('returnTo') ?? '/bookmarks')), 303);
+  return Astro.redirect(returnTo, 303);
 }
+
+// The middleware sends signed-out GETs to sign-in; this is a fallback.
+if (!user) return Astro.redirect('/auth/login?returnTo=/bookmarks');
 
 let bookmarks: Bookmark[] = [];
 let error: string | undefined;
@@ -36,31 +52,45 @@ try {
   console.error('bookmarks list failed', err);
   error = 'Your bookmarks are unavailable right now. Please try again shortly.';
 }
+const added = (iso: string) =>
+  new Date(iso).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney', dateStyle: 'medium' });
 ---
 
-<Base title="Bookmarks">
-  <h1>Your bookmarks</h1>
-  {error && <p class="error" role="alert">{error}</p>}
-  {!error && bookmarks.length === 0 && (
-    <p>No bookmarks yet. Open any object from <a href="/">search</a> and choose “Bookmark”.</p>
-  )}
-  <ul class="bookmarks">
+<Base title="Your bookmarks" width="narrow" noindex>
+  <div class="container narrow page">
+    <h1>Your bookmarks</h1>
+    {error && <p class="message error" role="alert">{error}</p>}
     {
-      bookmarks.map((f) => (
-        <li>
-          <span>
-            <a href={`/object/${f.objectId}`}>{f.title}</a>{' '}
-            <span class="muted">
-              added {new Date(f.addedAt).toLocaleDateString('en-AU', { timeZone: 'Australia/Sydney' })}
-            </span>
-          </span>
-          <form method="post" class="inline">
-            <input type="hidden" name="action" value="remove" />
-            <input type="hidden" name="objectId" value={f.objectId} />
-            <button type="submit" class="secondary" aria-label={`Remove ${f.title}`}>Remove</button>
-          </form>
-        </li>
-      ))
+      !error && bookmarks.length === 0 && (
+        <div class="paper">
+          <p>
+            No bookmarks yet. <a href="/">Search the collection</a>, and select the bookmark icon on
+            anything you'd like to keep.
+          </p>
+        </div>
+      )
     }
-  </ul>
+    {
+      bookmarks.length > 0 && (
+        <ul class="bookmark-list paper">
+          {bookmarks.map((b) => (
+            <li>
+              <div class="bookmark-text">
+                <a class="bookmark-title" href={`/object/${b.objectId}`}>{b.title}</a>
+                <span class="muted small">Saved {added(b.addedAt)}</span>
+              </div>
+              <form method="post">
+                <input type="hidden" name="action" value="remove" />
+                <input type="hidden" name="objectId" value={b.objectId} />
+                <input type="hidden" name="returnTo" value="/bookmarks" />
+                <button type="submit" class="icon-button" aria-label={`Remove bookmark: ${b.title}`}>
+                  <Icon name="close" />
+                </button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      )
+    }
+  </div>
 </Base>
