@@ -1,0 +1,109 @@
+---
+import type { CollectionObject } from '../../../functions/lib/nma/normalise.js';
+import BookmarkButton from './BookmarkButton.astro';
+
+/**
+ * One object's record, read live from the Museum's Collection API: on its own page, and in the
+ * right-hand pane of the results. Images are hotlinked from the Museum with their rights
+ * statements, and the record links back to the Museum's website (both required by its terms).
+ */
+interface Props {
+  object: CollectionObject;
+  bookmarked: boolean;
+  returnTo: string;
+  /** 1 on the object's own page; 2 inside the results page. */
+  headingLevel?: 1 | 2;
+}
+const { object, bookmarked, returnTo, headingLevel = 1 } = Astro.props;
+const Heading = headingLevel === 1 ? 'h1' : 'h2';
+const SubHeading = headingLevel === 1 ? 'h2' : 'h3';
+
+const summary = [object.types.join(', '), object.dateLabel, object.places[0]]
+  .filter(Boolean)
+  .join(', ');
+const facts = [
+  ['Type', object.types.join(', ')],
+  ['Date', object.dateLabel],
+  ['Place', object.places.join('; ')],
+  ['Made by', object.creators.join('; ')],
+  ['Materials', object.materials.join(', ')],
+  ['Collection', object.collection],
+  ['Accession number', object.accessionNumber],
+].filter(([, value]) => value) as [string, string][];
+const sydney = (iso: string, options: Intl.DateTimeFormatOptions) =>
+  new Date(iso).toLocaleString('en-AU', { timeZone: 'Australia/Sydney', ...options });
+const retrieved = sydney(object.retrievedAt, { dateStyle: 'long', timeStyle: 'short' });
+const modified = object.modified ? sydney(object.modified, { dateStyle: 'long' }) : undefined;
+const descriptions = [
+  object.physicalDescription,
+  object.contentDescription,
+  object.description,
+].filter(Boolean) as string[];
+---
+
+<article class="object">
+  <div class="object-head">
+    <div class="object-title">
+      <Heading>{object.title}</Heading>
+      {summary && <p class="muted">{summary}</p>}
+    </div>
+    <BookmarkButton
+      objectId={object.id}
+      title={object.title}
+      bookmarked={bookmarked}
+      returnTo={returnTo}
+      variant="button"
+    />
+  </div>
+
+  {
+    object.images.length > 0 && (
+      <div class="object-images">
+        {object.images.slice(0, 4).map((image) => (
+          <figure>
+            {/* Hotlinked from the Museum, never copied: its terms require this. */}
+            <img src={image.previewUrl ?? image.thumbnailUrl} alt="" loading="lazy" />
+            <figcaption>
+              {image.rightsUrl ? <a href={image.rightsUrl}>{image.rightsTitle}</a> : image.rightsTitle}
+            </figcaption>
+          </figure>
+        ))}
+      </div>
+    )
+  }
+
+  {descriptions.map((text) => <p class="object-text">{text}</p>)}
+
+  {
+    facts.length > 0 && (
+      <dl class="facts">
+        {facts.map(([label, value]) => (
+          <>
+            <dt>{label}</dt>
+            <dd>{value}</dd>
+          </>
+        ))}
+      </dl>
+    )
+  }
+
+  {
+    object.significanceStatement && (
+      <section class="object-collection">
+        <SubHeading>About the collection</SubHeading>
+        <p class="object-text">{object.significanceStatement}</p>
+      </section>
+    )
+  }
+
+  <p class:list={['message', object.images.length === 0 ? '' : 'plain']}>
+    {object.images.length === 0 && "The Museum's data has no image for this object. "}
+    <a href={object.sourceUrl}>See this record on the National Museum of Australia's website</a>.
+  </p>
+
+  <p class="muted small">
+    Read live from the Museum's Collection API on {retrieved}.
+    {modified && ` Record last updated by the Museum on ${modified}.`}
+    {object.licence && ` Licence: ${object.licence}.`}
+  </p>
+</article>

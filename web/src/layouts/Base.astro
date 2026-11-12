@@ -1,14 +1,22 @@
 ---
+import '@fontsource-variable/bricolage-grotesque/opsz.css';
+import '@fontsource-variable/atkinson-hyperlegible-next';
 import '../styles/global.css';
+import Icon from '../components/Icon.astro';
 import { APP_NAME, CULTURAL_NOTICE, NOTICE_COOKIE } from '../lib/notice.js';
 
 interface Props {
   title: string;
+  /** Keep this page out of search engines (results, sign-in, personal pages). */
+  noindex?: boolean;
+  /** `narrow` for single-column pages; results use the full width. */
+  width?: 'wide' | 'narrow';
 }
-const { title } = Astro.props;
+const { title, noindex = false, width = 'wide' } = Astro.props;
 const { user } = Astro.locals;
 const here = Astro.url.pathname + Astro.url.search;
 const showNotice = Astro.cookies.get(NOTICE_COOKIE)?.value !== 'dismissed';
+const container = width === 'narrow' ? 'container narrow' : 'container';
 ---
 
 <!doctype html>
@@ -16,58 +24,69 @@ const showNotice = Astro.cookies.get(NOTICE_COOKIE)?.value !== 'dismissed';
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0f3a40" />
+    {noindex && <meta name="robots" content="noindex, nofollow" />}
     <title>{title} · {APP_NAME}</title>
   </head>
   <body>
     {
       showNotice && (
         <aside class="notice" aria-label="Cultural notice">
-          <p>{CULTURAL_NOTICE}</p>
-          <form method="post" action="/notice">
-            <input type="hidden" name="returnTo" value={here} />
-            <button type="submit">Dismiss</button>
-          </form>
+          <div class="container">
+            <p>{CULTURAL_NOTICE}</p>
+            <form method="post" action="/notice">
+              <input type="hidden" name="returnTo" value={here} />
+              <button type="submit">Dismiss</button>
+            </form>
+          </div>
         </aside>
       )
     }
-    <header class="site-header">
-      <a class="brand" href="/">{APP_NAME}</a>
-      <nav aria-label="Main">
-        <a href="/">Search</a>
-        <a href="/ask">Ask</a>
-        <a href="/bookmarks">Bookmarks</a>
-      </nav>
-      <div class="account">
-        {
-          user ? (
-            <form method="post" action="/auth/logout">
-              <span>{user.email ?? 'Signed in'}</span>
-              <button type="submit">Sign out</button>
-            </form>
-          ) : (
-            <a href={`/auth/login?returnTo=${encodeURIComponent(here)}`}>Sign in</a>
-          )
-        }
-      </div>
-    </header>
+
+    <div class="band">
+      <header class:list={[container, 'site-header']}>
+        <a class="brand" href="/">Collection Search</a>
+        <div class="account">
+          <a href="/bookmarks" rel="nofollow">
+            <Icon name="bookmark" />
+            <span class="label">Bookmarks</span>
+          </a>
+          {
+            user ? (
+              <form method="post" action="/auth/logout">
+                <span class="who">{user.email ?? 'Signed in'}</span>
+                <button type="submit">Sign out</button>
+              </form>
+            ) : (
+              <a href={`/auth/login?returnTo=${encodeURIComponent(here)}`} rel="nofollow">
+                Sign in
+              </a>
+            )
+          }
+        </div>
+      </header>
+      <slot name="band" />
+    </div>
 
     <main>
       <slot />
     </main>
 
     <footer class="site-footer">
-      <p>{CULTURAL_NOTICE}</p>
-      <p>
-        {APP_NAME} was developed using the National Museum of Australia's
-        <a href="https://github.com/NationalMuseumAustralia/Collection-API">Collection API</a>.
-        Collection metadata © National Museum of Australia,
-        <a href="https://creativecommons.org/licenses/by-nc/4.0/">CC BY-NC 4.0</a>. Images are
-        shown from the Museum's website under the rights stated with each one.
-      </p>
-      <p>
-        An independent, non-commercial learning project. Not affiliated with or endorsed by the
-        National Museum of Australia.
-      </p>
+      <div class={container}>
+        <p>{CULTURAL_NOTICE}</p>
+        <p>
+          {APP_NAME} was developed using the National Museum of Australia's{' '}
+          <a href="https://github.com/NationalMuseumAustralia/Collection-API">Collection API</a>.
+          Collection metadata © National Museum of Australia,{' '}
+          <a href="https://creativecommons.org/licenses/by-nc/4.0/">CC BY-NC 4.0</a>. Images are
+          shown from the Museum's website under the rights stated with each one.
+        </p>
+        <p>
+          An independent, non-commercial learning project. Not affiliated with or endorsed by the
+          National Museum of Australia.
+        </p>
+      </div>
     </footer>
   </body>
 </html>

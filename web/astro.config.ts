@@ -10,6 +10,8 @@ export default defineConfig({
   output: 'server',
   adapter: node({ mode: 'standalone' }),
   server: { port: 4321, host: 'localhost' },
+  // Local pages look exactly like the hosted site (screenshots, reviews).
+  devToolbar: { enabled: false },
   security: {
     // On by default; stated because the POST forms rely on it: cross-site form posts are refused.
     checkOrigin: true,
