@@ -88,6 +88,11 @@ describe('buildSearchBody', () => {
     });
   });
 
+  it('lets the words match in different fields ("church" in the title, "Victoria" in the place)', () => {
+    const body = buildSearchBody({ ...defaults, q: 'churches in victoria' });
+    expect(keywordQuery(body).must[0]).toMatchObject({ multi_match: { type: 'cross_fields' } });
+  });
+
   it('includes the accession number, so staff can look an object up by its number', () => {
     const body = buildSearchBody({ ...defaults, q: '2016.0013.0001' });
     expect(keywordQuery(body).must[0]).toMatchObject({

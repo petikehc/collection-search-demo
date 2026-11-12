@@ -83,6 +83,12 @@ A second measure that counts order (the reciprocal rank of the first right objec
 
 No single weighting is best for both, so there are now two pipelines: `objects-hybrid` (0.6/0.4) for keyword-style searches, and `objects-hybrid-question` (0.2/0.8) for searches that look like questions, using the same question detection as the web site (a question mark, a question word first, or six words or more). 0.2/0.8 rather than 0.1/0.9 keeps some weight on exact words for questions that name something, given only 20 questions to judge by. `pnpm eval:search` now reports MRR and hit@3.
 
+## Update: words matched across fields (12 November 2026)
+
+"Churches in Victoria?" ranked a Sydney church 2nd and a Victorian church's records 14th. The keyword query was `best_fields`, whose "most of the words" rule applies to each field separately. So an object with "Church" in its title and "Victoria" in its place didn't count as a keyword match, while one whose description mentions "Victoria Park" did. The query is now `cross_fields`, which matches the text fields as one. Every text field uses the same analyser, so they blend into one group; the accession number (a keyword field) stays its own group, and number lookups and synonyms work as before.
+
+On the same index (`evals/results/2026-11-12-search-cross-fields.md`): the Victorian churches went from 1st, 3rd and 14th to 1st, 2nd and 4th. Keyword matches for "churches in victoria" went from 9 to 14, and question hit@3 from 80% to 85%. MRR moved from 0.72 to 0.69 and keyword precision from 99% to 94%. Checked by hand: the "postcard" drop is the measure's 50-result limit (all ten results are postcards). For "polar medal", the husky's dog collar went from 2nd to 10th, behind other medals. Accepted for the gain on searches that name a place.
+
 ## Consequences
 
 - **Easier:** questions and misspellings find objects. The result list and the AI answer now draw on the same kind of retrieval.
