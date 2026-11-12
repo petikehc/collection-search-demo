@@ -4,6 +4,7 @@ import { toKbFiles } from '../lib/kb/documents.js';
 import { syncKbFiles } from '../lib/kb/sync.js';
 import { NmaClient } from '../lib/nma/client.js';
 import { type CollectionObject, normaliseObject } from '../lib/nma/normalise.js';
+import { fetchMissingPinned } from '../lib/nma/pinned.js';
 import { DEFAULT_SAMPLE_SLICES, fetchSample } from '../lib/nma/sample.js';
 import { createOpenSearchClient } from '../lib/opensearch/client.js';
 import { OBJECTS_ALIAS } from '../lib/search/constants.js';
@@ -34,6 +35,7 @@ export async function handler(event: IngestEvent = {}) {
 
   let fetched: number;
   let objects: CollectionObject[];
+  let pinned: { added: number; withdrawn: string[] } | undefined;
   if (event.reindexFrom) {
     if (!new RegExp(`^${OBJECTS_ALIAS}-\\d{14}$`).test(event.reindexFrom)) {
       throw new Error(`reindexFrom must be a versioned index like ${OBJECTS_ALIAS}-20261110235504`);
@@ -43,7 +45,11 @@ export async function handler(event: IngestEvent = {}) {
     fetched = objects.length;
   } else {
     const nma = new NmaClient({ apiKey: process.env.NMA_API_KEY || undefined });
-    const raw = await fetchSample(nma, { slices: DEFAULT_SAMPLE_SLICES });
+    const sample = await fetchSample(nma, { slices: DEFAULT_SAMPLE_SLICES });
+    // The eval set's and the demo's objects, whatever the sample drew (lib/nma/pinned.ts).
+    const extra = await fetchMissingPinned(nma, new Set(sample.map((o) => o.id)));
+    pinned = { added: extra.objects.length, withdrawn: extra.withdrawn };
+    const raw = [...sample, ...extra.objects];
     const retrievedAt = new Date().toISOString();
     objects = raw
       .map((r) => normaliseObject(r, retrievedAt))
@@ -72,6 +78,7 @@ export async function handler(event: IngestEvent = {}) {
     ...result,
     kbSync,
     source: event.reindexFrom ?? 'Collection API',
+    ...(pinned && { pinned }),
     fetched,
     dropped: fetched - objects.length,
     embedSeconds,
