@@ -94,5 +94,5 @@ No single weighting is best for both, so there are now two pipelines: `objects-h
 - **Known limits:**
   - The settings were tuned on a small eval set (20 questions, 15 keyword queries), so they are a starting point, not a proof.
   - Embeddings still miss what words mean in context: "before cars" returns cars.
-  - A fresh `pnpm ingest` still draws a different sample when the Museum's data has changed. Pinning the sample is the next step.
+  - A fresh `pnpm ingest` still draws a different sample when the Museum's data has changed. The eval set's and the walkthrough's objects are pinned: every ingest fetches any the sample missed, one request each, because the API can't fetch a list of IDs at once (pinning the whole sample that way would take over an hour).
 - **Revisit:** warming the vector index after each ingest; a larger eval set; weights per query type, if exact lookups and questions ever need different settings.
