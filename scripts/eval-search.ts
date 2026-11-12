@@ -74,8 +74,10 @@ for (const q of keywords) {
   const first = ids(hybrid).slice(0, Math.min(TOP, matching.size) || TOP);
   const share = matching.size ? first.filter((id) => matching.has(id)).length / first.length : 0;
   precision.push(share);
+  // With more matches than one page can list, some matching results go unrecognised.
+  const atLeast = hybrid.keywordTotal > matching.size ? 'at least ' : '';
   keywordRows.push(
-    `| ${q} | ${hybrid.keywordTotal} | ${hybrid.total - hybrid.keywordTotal} | ${pct(share)} |`,
+    `| ${q} | ${hybrid.keywordTotal} | ${hybrid.total - hybrid.keywordTotal} | ${atLeast}${pct(share)} |`,
   );
 }
 
@@ -104,6 +106,9 @@ const lines = [
   `| Query | Objects matching the words | Extra objects by meaning | First ${TOP} that match the words |`,
   '| --- | --- | --- | --- |',
   ...keywordRows,
+  '',
+  '"At least": the query matches more objects than the 50 the API lists per page, so some of the',
+  'first 10 may match the words without being recognised here. The summary figure is a lower bound.',
   '',
 ];
 const dir = new URL('results/', root);
