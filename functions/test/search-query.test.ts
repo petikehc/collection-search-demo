@@ -178,7 +178,13 @@ describe('toSearchResponse', () => {
             title: 'Boomerang',
             types: ['Boomerangs'],
             places: [],
-            images: [{ rightsTitle: 'CC BY-SA 4.0', thumbnailUrl: 'https://example.org/t.jpg' }],
+            images: [
+              {
+                rightsTitle: 'CC BY-SA 4.0',
+                thumbnailUrl: 'https://example.org/t.jpg',
+                previewUrl: 'https://example.org/w.jpg',
+              },
+            ],
             sourceUrl: 'https://example.org/1',
             retrievedAt: '2026-11-11T00:00:00.000Z',
           },
@@ -199,7 +205,11 @@ describe('toSearchResponse', () => {
     expect(res).toMatchObject({ total: 1, keywordTotal: 1, mode: 'keyword' });
     expect(res.results[0]).toMatchObject({
       id: '1',
-      thumbnail: { url: 'https://example.org/t.jpg', rightsTitle: 'CC BY-SA 4.0' },
+      thumbnail: {
+        url: 'https://example.org/t.jpg',
+        previewUrl: 'https://example.org/w.jpg',
+        rightsTitle: 'CC BY-SA 4.0',
+      },
       highlight: 'carved <mark>boomerang</mark>',
     });
     expect(res.facets).toEqual({

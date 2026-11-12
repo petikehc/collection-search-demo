@@ -334,7 +334,16 @@ components:
       type: object
       required: [url, rightsTitle]
       properties:
-        url: { type: string, description: Hotlinked from the Museum; never copied }
+        url:
+          {
+            type: string,
+            description: "Hotlinked from the Museum; never copied. A thumbnail, about 200 px wide",
+          }
+        previewUrl:
+          type: string
+          description: >-
+            The same image about 800 px wide, also hotlinked from the Museum: for anything shown
+            larger than the thumbnail, or on a high-density screen (use both in a srcset)
         rightsTitle: { type: string }
         rightsUrl: { type: string }
 
