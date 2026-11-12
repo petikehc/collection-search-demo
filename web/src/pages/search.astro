@@ -187,7 +187,11 @@ const title = state.q ? `“${state.q}”` : 'Browse the collection';
         result && lastPage > 1 && (
           <nav class="pager" aria-label="Pages">
             {page > 1 ? (
-              <a href={searchUrl(state, { page: page - 1, id: undefined })} rel="nofollow">
+              <a
+                class="pager-link"
+                href={searchUrl(state, { page: page - 1, id: undefined })}
+                rel="nofollow"
+              >
                 Previous
               </a>
             ) : (
@@ -198,7 +202,11 @@ const title = state.q ? `“${state.q}”` : 'Browse the collection';
               {result.mode === 'hybrid' && result.total > maxResults && ', the best 200 matches'}
             </span>
             {page < lastPage ? (
-              <a href={searchUrl(state, { page: page + 1, id: undefined })} rel="nofollow">
+              <a
+                class="pager-link"
+                href={searchUrl(state, { page: page + 1, id: undefined })}
+                rel="nofollow"
+              >
                 Next
               </a>
             ) : (
