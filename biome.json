@@ -6,7 +6,7 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/cdk.out", "!**/dist", "!**/.astro", "!**/*.gen.ts"]
+    "includes": ["**", "!**/cdk.out", "!**/dist", "!**/.astro", "!**/*.gen.ts", "!evals/results"]
   },
   "formatter": {
     "indentStyle": "space",
