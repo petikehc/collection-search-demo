@@ -45,6 +45,8 @@ const WEB_DIR = new URL('../../web/', import.meta.url).pathname;
 const WEB_ADAPTER_LAYER =
   'arn:aws:lambda:ap-southeast-2:753240598075:layer:LambdaAdapterLayerArm64:30';
 const PORT = '8080';
+/** Requests an hour to the site that are worth an email. */
+export const SITE_TRAFFIC_ALARM_PER_HOUR = 20_000;
 
 export interface WebStackProps extends StackProps {
   apiUrl: string;
@@ -122,6 +124,9 @@ export class WebStack extends Stack {
             method: '$context.httpMethod',
             path: '$context.path',
             status: '$context.status',
+            // Who's crawling: the access logs showed tens of thousands of requests from two
+            // addresses, with nothing to say what they were.
+            userAgent: '$context.identity.userAgent',
             latencyMs: '$context.responseLatency',
             integrationLatencyMs: '$context.integrationLatency',
           }),
@@ -148,6 +153,17 @@ export class WebStack extends Stack {
       'The web front end returned server errors',
       api.metricServerError({ period: Duration.minutes(5), statistic: 'Sum' }),
     );
+
+    // About ten times the busiest hour so far (a crawler, about 10,000 requests): an email
+    // within the hour, rather than a budget alert hours later.
+    new Alarm(this, 'SiteTraffic', {
+      alarmDescription: 'Unusually heavy traffic to the web site: probably a crawler or a flood',
+      metric: api.metricCount({ period: Duration.hours(1), statistic: 'Sum' }),
+      threshold: SITE_TRAFFIC_ALARM_PER_HOUR,
+      comparisonOperator: ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods: 1,
+      treatMissingData: TreatMissingData.NOT_BREACHING,
+    }).addAlarmAction(new SnsAction(props.alarmTopic));
 
     new CfnOutput(this, 'SiteUrl', { value: `https://${props.domainName.name}` });
   }

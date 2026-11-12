@@ -246,7 +246,9 @@ export class ApiStack extends Stack {
     const plan = api.addUsagePlan('WebPlan', {
       description: 'Web front end: per-key throttle and daily quota',
       throttle: { rateLimit: 5, burstLimit: 10 },
-      quota: { limit: 5000, period: Period.DAY },
+      // Raised from 5,000 after a crawler used it all in one evening, taking search down for
+      // the day. The web server's per-address limits now slow crawlers first.
+      quota: { limit: 20_000, period: Period.DAY },
     });
     plan.addApiKey(key);
     plan.addApiStage({ stage: api.deploymentStage });

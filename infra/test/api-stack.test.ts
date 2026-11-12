@@ -59,7 +59,7 @@ describe('ApiStack', () => {
     });
     template.hasResourceProperties('AWS::ApiGateway::UsagePlan', {
       Throttle: { RateLimit: 5, BurstLimit: 10 },
-      Quota: { Limit: 5000, Period: 'DAY' },
+      Quota: { Limit: 20_000, Period: 'DAY' },
     });
   });
 
