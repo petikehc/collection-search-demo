@@ -8,7 +8,7 @@ import SearchBox from '../components/SearchBox.astro';
 import Base from '../layouts/Base.astro';
 import { ApiError, listBookmarks, type SearchResponse, search } from '../lib/api.js';
 import { getObject } from '../lib/museum.js';
-import { isPersonsAction, looksLikeQuestion } from '../lib/question.js';
+import { isNavigationOnThisSite, looksLikeQuestion } from '../lib/question.js';
 import { readSearch, searchUrl, withFilter } from '../lib/search-url.js';
 
 const PAGE_SIZE = 20;
@@ -20,14 +20,14 @@ const state = readSearch(Astro.url.searchParams);
 const here = searchUrl(state);
 
 // An AI answer fills the pane when nothing is selected and a person asked for one: they
-// submitted a question, or pressed "Ask AI" (a form POST). Loading the URL alone never
-// starts one, so crawlers can't spend the daily allowance (ADR 15).
+// searched a question from one of our pages, or pressed "Ask AI" (a form POST). A URL loaded
+// by a tool, or a link opened from elsewhere, never starts one (ADR 15).
 const askedByForm =
   Astro.request.method === 'POST' && (await Astro.request.formData()).get('ask') === '1';
 const wantAnswer =
   Boolean(state.q) &&
   !state.id &&
-  (askedByForm || (looksLikeQuestion(state.q) && isPersonsAction(Astro.request.headers)));
+  (askedByForm || (looksLikeQuestion(state.q) && isNavigationOnThisSite(Astro.request.headers)));
 
 const [searchResult, objectResult, bookmarksResult] = await Promise.allSettled([
   search({
@@ -253,7 +253,7 @@ const title = state.q ? `“${state.q}”` : 'Browse the collection';
       {
         wantAnswer && state.q ? (
           <Answer server:defer question={state.q}>
-            <div slot="fallback" class="answer">
+            <div slot="fallback" class="answer" data-answer-pending>
               <p class="answer-label">
                 <Icon name="sparkle" /> AI answer
               </p>
@@ -324,6 +324,13 @@ const title = state.q ? `“${state.q}”` : 'Browse the collection';
     }
   });
   window.addEventListener('popstate', () => window.location.reload());
+
+  // If the answer never arrives (a crash or a dropped connection), say so instead of waiting
+  // for good. Answers take a few seconds; the server gives up at 30.
+  setTimeout(() => {
+    const status = document.querySelector('[data-answer-pending] [role="status"]');
+    if (status) status.textContent = "The answer didn't arrive. Reload the page to try again.";
+  }, 35_000);
 
   // One dropdown open at a time; Escape or a click elsewhere closes it.
   const menus = () => document.querySelectorAll<HTMLDetailsElement>('details.filter-menu');
