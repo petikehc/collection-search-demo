@@ -1,6 +1,6 @@
 # 9. Sign-in with Cognito: managed login, code grant with PKCE, scopes checked at the gateway
 
-- Status: accepted
+- Status: accepted; Ask no longer needs sign-in ([ADR 15](0015-ask-without-sign-in.md))
 - Date: 2026-11-11
 
 ## Context
@@ -44,7 +44,7 @@ Both clients:
 - allow only localhost callback URLs (the hosted site's HTTPS URL was added later: ADR 13);
 - issue access tokens that last 1 hour and refresh tokens that last 1 day.
 
-**Authorisation by scope, at the gateway.** A resource server `collection-search` defines two scopes, `ask` and `favourites`. Each API operation lists the scope it needs in `openapi.yaml`, and API Gateway's Cognito authoriser checks it before any Lambda runs:
+**Authorisation by scope, at the gateway.** A resource server `collection-search` defines two scopes, `ask` and `favourites` (`ask` was removed later, when Ask opened to everyone: ADR 15). Each API operation lists the scope it needs in `openapi.yaml`, and API Gateway's Cognito authoriser checks it before any Lambda runs:
 
 - the token's signature, expiry and issuer;
 - that the token is an **access** token. An ID token says who you are, not what an app may do on your behalf, so it can't be used.

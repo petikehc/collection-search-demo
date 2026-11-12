@@ -102,11 +102,28 @@ describe('ApiStack /ask', () => {
   const spec = Object.values(template.findResources('AWS::ApiGateway::RestApi'))[0]?.Properties
     .Body;
 
-  it('requires an access token with the ask scope and the API key, and validates the body', () => {
-    // One requirement object: both are needed (separate objects would mean either).
-    expect(spec.paths['/ask'].post.security).toEqual([
-      { cognito: ['collection-search/ask'], apiKey: [] },
-    ]);
+  it('counts answers against a daily allowance it can only increment', () => {
+    template.hasResourceProperties('AWS::DynamoDB::GlobalTable', {
+      KeySchema: [{ AttributeName: 'day', KeyType: 'HASH' }],
+      TimeToLiveSpecification: { AttributeName: 'expiresAt', Enabled: true },
+    });
+    const [ask] = Object.values(
+      template.findResources('AWS::Lambda::Function', {
+        Properties: { Description: Match.stringLikeRegexp('POST /ask') },
+      }),
+    );
+    expect(ask?.Properties.Environment.Variables).toMatchObject({ DAILY_CAP: '500' });
+    const statements = Object.values(template.findResources('AWS::IAM::Policy')).flatMap(
+      (p) => p.Properties.PolicyDocument.Statement,
+    );
+    // Every statement on the allowance table, whichever role it belongs to.
+    const onBudget = statements.filter((st) => JSON.stringify(st.Resource).includes('AskBudget'));
+    expect(onBudget).toHaveLength(1);
+    expect(onBudget[0]?.Action).toBe('dynamodb:UpdateItem');
+  });
+
+  it('needs the API key but no sign-in, and validates the body', () => {
+    expect(spec.paths['/ask'].post.security).toEqual([{ apiKey: [] }]);
     expect(spec.paths['/ask'].post['x-amazon-apigateway-request-validator']).toBe('body');
   });
 

@@ -1,6 +1,6 @@
 /**
- * Calls the deployed API the way the web front end will: with the API key, and (for /ask and
- * /favourites) a Cognito access token from signing in on the managed login page.
+ * Calls the deployed API the way the web front end does: with the API key, and (for /favourites)
+ * a Cognito access token from signing in on the managed login page.
  *
  * Sign-in uses the public `cli` app client: this opens the browser at managed login, listens on
  * localhost for the redirect, and exchanges the code with its PKCE verifier. The access token is

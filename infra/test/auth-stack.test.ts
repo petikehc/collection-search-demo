@@ -31,13 +31,10 @@ describe('AuthStack', () => {
     template.resourceCountIs('AWS::Cognito::ManagedLoginBranding', 2);
   });
 
-  it('defines the ask and favourites scopes on the API resource server', () => {
+  it('defines the favourites scope on the API resource server (Ask needs no sign-in)', () => {
     template.hasResourceProperties('AWS::Cognito::UserPoolResourceServer', {
       Identifier: 'collection-search',
-      Scopes: [
-        Match.objectLike({ ScopeName: 'ask' }),
-        Match.objectLike({ ScopeName: 'favourites' }),
-      ],
+      Scopes: [Match.objectLike({ ScopeName: 'favourites' })],
     });
   });
 
@@ -59,7 +56,6 @@ describe('AuthStack', () => {
       expect(c.AllowedOAuthScopes).toEqual([
         'openid',
         'email',
-        { 'Fn::Join': ['', [server, '/ask']] },
         { 'Fn::Join': ['', [server, '/favourites']] },
       ]);
     }

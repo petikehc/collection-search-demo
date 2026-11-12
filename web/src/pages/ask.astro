@@ -2,14 +2,13 @@
 import Base from '../layouts/Base.astro';
 import { ApiError, type AskResponse, ask } from '../lib/api.js';
 
-// The middleware only lets signed-in users reach this page.
-const user = Astro.locals.user;
-if (!user) return Astro.redirect('/auth/login?returnTo=/ask');
-
 let question = '';
 let answer: AskResponse | undefined;
 let error: string | undefined;
 
+// An answer only comes from submitting the form (a POST), never from loading a URL, so a
+// crawler following links can't spend the daily allowance. Astro's origin check refuses
+// cross-site posts.
 if (Astro.request.method === 'POST') {
   const form = await Astro.request.formData();
   question = String(form.get('question') ?? '').trim();
@@ -17,14 +16,14 @@ if (Astro.request.method === 'POST') {
     error = 'Please ask a question of 3 to 500 characters.';
   } else {
     try {
-      answer = await ask(user.accessToken, question);
+      answer = await ask(question);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        return Astro.redirect('/auth/login?returnTo=/ask');
-      }
+      // The API's 429 message says which limit: the per-second throttle or the daily allowance.
       error =
         err instanceof ApiError && err.status === 429
-          ? "You're asking faster than the limit allows. Wait a moment and try again."
+          ? err.message === 'Limit Exceeded'
+            ? "You're asking faster than the limit allows. Wait a moment and try again."
+            : err.message
           : 'Ask is unavailable right now. Please try again shortly.';
       console.error('ask failed', err);
     }
@@ -36,7 +35,8 @@ if (Astro.request.method === 'POST') {
   <h1>Ask the collection</h1>
   <p class="muted">
     Answers are written by an AI model using only the collection records it finds, with links to
-    them. It can still be wrong: check the records it cites.
+    them. It can still be wrong: check the records it cites. Please don't include personal
+    details in your question.
   </p>
   <form class="ask-form" method="post">
     <label for="question">Your question</label>

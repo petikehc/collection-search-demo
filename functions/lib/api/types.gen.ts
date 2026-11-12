@@ -34,7 +34,10 @@ export interface paths {
          * Ask a question about the collection (RAG with citations)
          * @description Retrieves relevant collection records from the Bedrock Knowledge Base and has a model
          *     answer from them only, with citations. A Bedrock Guardrail checks the question and the
-         *     answer. Needs a signed-in user's access token with the `ask` scope, and the API key.
+         *     answer.
+         *
+         *     Needs the API key only, which the web server holds: there is no sign-in. Cost is bounded
+         *     by a daily allowance of answers shared by all callers, on top of the throttle.
          */
         post: operations["askCollection"];
         delete?: never;
@@ -273,14 +276,21 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            401: components["responses"]["Unauthorized"];
-            403: components["responses"]["Forbidden"];
-            /** @description Throttled */
-            429: {
+            /** @description Missing or invalid API key */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Throttled, or today's allowance of answers is used up */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
             };
         };
     };
