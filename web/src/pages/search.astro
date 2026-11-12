@@ -1,4 +1,5 @@
 ---
+import Answer from '../components/Answer.astro';
 import BookmarkButton from '../components/BookmarkButton.astro';
 import FilterMenu from '../components/FilterMenu.astro';
 import Icon from '../components/Icon.astro';
@@ -7,6 +8,7 @@ import SearchBox from '../components/SearchBox.astro';
 import Base from '../layouts/Base.astro';
 import { ApiError, listBookmarks, type SearchResponse, search } from '../lib/api.js';
 import { getObject } from '../lib/museum.js';
+import { isPersonsAction, looksLikeQuestion } from '../lib/question.js';
 import { readSearch, searchUrl, withFilter } from '../lib/search-url.js';
 
 const PAGE_SIZE = 20;
@@ -16,6 +18,16 @@ const HYBRID_DEPTH = 200;
 const { user } = Astro.locals;
 const state = readSearch(Astro.url.searchParams);
 const here = searchUrl(state);
+
+// An AI answer fills the pane when nothing is selected and a person asked for one: they
+// submitted a question, or pressed "Ask AI" (a form POST). Loading the URL alone never
+// starts one, so crawlers can't spend the daily allowance (ADR 15).
+const askedByForm =
+  Astro.request.method === 'POST' && (await Astro.request.formData()).get('ask') === '1';
+const wantAnswer =
+  Boolean(state.q) &&
+  !state.id &&
+  (askedByForm || (looksLikeQuestion(state.q) && isPersonsAction(Astro.request.headers)));
 
 const [searchResult, objectResult, bookmarksResult] = await Promise.allSettled([
   search({
@@ -139,7 +151,22 @@ const title = state.q ? `“${state.q}”` : 'Browse the collection';
 
     <section class="results-list" aria-label="Results">
       {error && <p class="message error" role="alert">{error}</p>}
-      {result && <p class="muted results-count">{countText}</p>}
+      {
+        result && (
+          <div class="results-head">
+            <p class="muted">{countText}</p>
+            {state.q && !wantAnswer && (
+              <form method="post" action={here}>
+                <input type="hidden" name="ask" value="1" />
+                <button type="submit" class="text-button">
+                  <Icon name="sparkle" />
+                  Ask AI about “{state.q}”
+                </button>
+              </form>
+            )}
+          </div>
+        )
+      }
       {
         result && result.results.length === 0 && (
           <p class="message">
@@ -217,9 +244,26 @@ const title = state.q ? `“${state.q}”` : 'Browse the collection';
       }
     </section>
 
-    <section id="pane" class="pane paper" aria-label="Selected object" aria-live="polite">
+    <section
+      id="pane"
+      class:list={['pane paper', wantAnswer && 'has-answer']}
+      aria-label={wantAnswer ? 'AI answer' : 'Selected object'}
+      aria-live="polite"
+    >
       {
-        selected ? (
+        wantAnswer && state.q ? (
+          <Answer server:defer question={state.q}>
+            <div slot="fallback" class="answer">
+              <p class="answer-label">
+                <Icon name="sparkle" /> AI answer
+              </p>
+              <h2>{state.q}</h2>
+              <p class="muted" role="status">
+                Writing an answer from the Museum's records. This takes a few seconds.
+              </p>
+            </div>
+          </Answer>
+        ) : selected ? (
           <>
             <a class="back-link pane-back" href={searchUrl(state, { id: undefined })}>
               <Icon name="back" />
@@ -238,7 +282,15 @@ const title = state.q ? `“${state.q}”` : 'Browse the collection';
             again shortly.
           </p>
         ) : (
-          <p class="muted pane-empty">Select an object to see its record here.</p>
+          <div class="pane-empty">
+            <p class="muted">Select an object to see its record here.</p>
+            {state.q && (
+              <p class="muted small">
+                Or ask AI about it, above the results. Answers are written by an AI model from the
+                Museum's records, so please don't include personal details.
+              </p>
+            )}
+          </div>
         )
       }
     </section>
