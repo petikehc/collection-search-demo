@@ -8,11 +8,7 @@ It indexes a sample of the National Museum of Australia's public collection (abo
 
 **Walkthrough** (1 minute; the Museum's images are blurred in the video, as its terms allow them only beside their record):
 
-
 https://github.com/user-attachments/assets/26514f48-b14f-4b1c-b1ec-2d37ed8040c1
-
-
-
 
 ## What it does
 
