@@ -9,12 +9,12 @@
     "typecheck": "astro check"
   },
   "dependencies": {
-    "@astrojs/node": "11.1.9",
-    "@aws-sdk/client-cloudformation": "3.1165.0",
-    "@aws-sdk/client-secrets-manager": "3.1165.0",
+    "@astrojs/node": "11.1.12",
+    "@aws-sdk/client-cloudformation": "3.1166.0",
+    "@aws-sdk/client-secrets-manager": "3.1166.0",
     "@fontsource-variable/atkinson-hyperlegible-next": "5.3.0",
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
-    "astro": "7.4.4",
+    "astro": "7.4.10",
     "aws-jwt-verify": "5.2.1"
   },
   "devDependencies": {
